@@ -1,0 +1,18 @@
+import { useLocalPlayer } from '../state/LocalPlayerContext'
+import AlbumGridCarousel from '../components/AlbumGridCarousel'
+import './AlbumsPage.css'
+
+export default function AlbumsPage() {
+  const { albums } = useLocalPlayer()
+
+  return (
+    <main className="panel albums-page">
+      <h2 style={{ marginBottom: '24px' }}>Albums</h2>
+      {albums.length === 0 ? (
+        <p className="muted">No albums found.</p>
+      ) : (
+        <AlbumGridCarousel albums={albums} />
+      )}
+    </main>
+  )
+}

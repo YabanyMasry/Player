@@ -1,0 +1,267 @@
+.test-page {
+  padding: 20px;
+}
+
+.test-section {
+  margin-top: 24px;
+}
+
+.test-section h3 {
+  margin-bottom: 12px;
+  color: var(--text-2);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.test-hint {
+  color: var(--text-2);
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.test-stage {
+  position: relative;
+  height: 360px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: radial-gradient(circle at 18% 22%, #2f2f2f, var(--surface) 55%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
+.carousel-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.carousel-controls button {
+  min-width: 88px;
+}
+
+.test-stage--carousel {
+  height: 300px;
+}
+
+.test-stage--reveal {
+  height: 280px;
+}
+
+.test-stage--grid {
+  height: 340px;
+}
+
+.test-stage--combo {
+  height: 360px;
+}
+
+.carousel-viewport {
+  width: min(620px, 90%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.carousel-track {
+  display: flex;
+  width: 100%;
+}
+
+.carousel-slide {
+  min-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 22px;
+}
+
+.carousel-card {
+  width: min(460px, 100%);
+  height: 160px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+}
+
+.carousel-card__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.carousel-card__artist {
+  font-size: 0.9rem;
+  opacity: 0.88;
+}
+
+.reveal-layout {
+  width: min(640px, 90%);
+  display: grid;
+  grid-template-columns: 140px minmax(200px, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: 30px;
+}
+
+.reveal-square {
+  width: 120px;
+  height: 120px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(145deg, #2f4b70, #203248);
+  font-weight: 700;
+}
+
+.reveal-panel {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 14px 16px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reveal-panel h4 {
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.reveal-panel ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 6px;
+  color: var(--text-2);
+}
+
+.grid-stage {
+  width: min(520px, 88%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  gap: 14px;
+}
+
+.grid-square {
+  height: 92px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-weight: 700;
+  color: #fff;
+}
+
+.grid-square--active {
+  outline: 2px solid var(--accent);
+}
+
+.combo-grid-wrap,
+.combo-carousel-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.combo-grid {
+  width: min(520px, 88%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  gap: 14px;
+}
+
+.combo-square {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #fff;
+  font-weight: 700;
+}
+
+.combo-morph {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.combo-carousel-wrap {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.combo-carousel-viewport {
+  width: min(620px, 90%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.combo-carousel-track {
+  display: flex;
+  width: 100%;
+}
+
+.combo-carousel-slide {
+  min-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 22px;
+}
+
+.combo-carousel-card {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.combo-carousel-card__title {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.test-stage--record-reveal {
+  height: 380px;
+}
+
+.record-reveal-layout {
+  position: relative;
+  width: 100%;
+  max-width: 780px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.record-reveal-card-wrap {
+  position: relative;
+  z-index: 2;
+}
+
+.record-reveal-panel {
+  position: absolute;
+  left: calc(50% + 60px);
+  width: 280px;
+  z-index: 10;
+}
+
+.record-reveal-panel ul {
+  gap: 10px;
+}
