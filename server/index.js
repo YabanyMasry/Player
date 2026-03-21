@@ -140,71 +140,113 @@ async function scanLibrary() {
 
   for (const dir of albumDirs) {
     const albumFolderName = dir.name
-    const albumMeta = parseAlbumFolderName(albumFolderName)
     const albumAbsPath = path.join(ALBUMS_ROOT, albumFolderName)
-    const entries = await fs.readdir(albumAbsPath, { withFileTypes: true })
+
+    let jsonMeta = null
+    try {
+      const jsonText = await fs.readFile(path.join(albumAbsPath, `${albumFolderName}.json`), 'utf8')
+      jsonMeta = JSON.parse(jsonText)
+    } catch {
+      // ignore
+    }
+
+    const fallbackMeta = parseAlbumFolderName(albumFolderName)
+    const albumTitle = jsonMeta?.playlist?.title || fallbackMeta.albumTitle
+    const albumArtist = jsonMeta?.playlist?.artist?.name || fallbackMeta.albumArtist
+
+    const allFiles = []
+    async function walk(currentDir) {
+      const entries = await fs.readdir(currentDir, { withFileTypes: true })
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name)
+        if (entry.isDirectory()) {
+          await walk(fullPath)
+        } else {
+          allFiles.push({
+            name: entry.name,
+            fullPath,
+            dirName: path.basename(currentDir),
+          })
+        }
+      }
+    }
+    await walk(albumAbsPath)
 
     let coverRelativePath = null
     let playlistOrderMap = new Map()
     const lyricsByBase = new Map()
 
-    for (const entry of entries) {
-      if (!entry.isFile()) continue
-      const lower = entry.name.toLowerCase()
-      const rel = toPosix(path.join(albumFolderName, entry.name))
+    for (const file of allFiles) {
+      const lower = file.name.toLowerCase()
+      const rel = toPosix(path.relative(ALBUMS_ROOT, file.fullPath))
 
-      if (COVER_RE.test(entry.name)) {
-        coverRelativePath = rel
+      if (COVER_RE.test(file.name)) {
+        if (!coverRelativePath) coverRelativePath = rel
         continue
       }
-
       if (PLAYLIST_EXT_RE.test(lower)) {
         try {
-          const m3uText = await fs.readFile(path.join(albumAbsPath, entry.name), 'utf8')
+          const m3uText = await fs.readFile(file.fullPath, 'utf8')
           const parsed = parseM3uOrder(m3uText)
-          if (parsed.size > 0) {
-            playlistOrderMap = parsed
-          }
-        } catch {
-          // Ignore malformed playlist files.
-        }
+          if (parsed.size > 0) playlistOrderMap = parsed
+        } catch {}
         continue
       }
-
       if (LRC_EXT_RE.test(lower)) {
         try {
-          const lrcText = await fs.readFile(path.join(albumAbsPath, entry.name), 'utf8')
-          lyricsByBase.set(stripExtension(entry.name).toLowerCase(), parseLrcText(lrcText))
-        } catch {
-          // Ignore unreadable lyrics files.
-        }
+          const lrcText = await fs.readFile(file.fullPath, 'utf8')
+          lyricsByBase.set(stripExtension(file.name).toLowerCase(), parseLrcText(lrcText))
+        } catch {}
       }
     }
 
-    const audioEntries = entries.filter(entry => entry.isFile() && AUDIO_EXT_RE.test(entry.name))
+    const audioFiles = allFiles.filter(f => AUDIO_EXT_RE.test(f.name))
 
-    const parsedAlbumTracks = audioEntries.map((entry) => {
-      const fileName = entry.name
+    const parsedAlbumTracks = audioFiles.map((file) => {
+      const fileName = file.name
+      const relativePath = toPosix(path.relative(ALBUMS_ROOT, file.fullPath))
+      const basenm = stripExtension(fileName)
+
+      let discNumber = 1
+      const discMatch = file.dirName.match(/Disc\s*(\d+)/i)
+      if (discMatch) {
+        discNumber = Number.parseInt(discMatch[1], 10)
+      }
+
+      let jsonTrack = null
+      if (jsonMeta && Array.isArray(jsonMeta.tracks)) {
+        const match = basenm.match(/^(\d+)/)
+        if (match) {
+          const pos = Number.parseInt(match[1], 10)
+          jsonTrack = jsonMeta.tracks.find(t => t.position === pos || t.trackNumber === pos)
+        }
+      }
+
       const trackMeta = parseTrackFileName(fileName)
       const playlistOrder = playlistOrderMap.get(fileName.toLowerCase())
-      const relativePath = toPosix(path.join(albumFolderName, fileName))
+
+      const finalArtist = jsonTrack?.artist || trackMeta.artist || albumArtist
+      const finalTitle = jsonTrack?.title || trackMeta.title
 
       return {
         id: relativePath,
-        album: albumMeta.albumTitle,
-        albumArtist: albumMeta.albumArtist,
-        artist: trackMeta.artist || albumMeta.albumArtist,
-        title: trackMeta.title,
+        album: albumTitle,
+        albumArtist: albumArtist,
+        artist: finalArtist,
+        title: finalTitle,
         filename: fileName,
         relativePath,
-        trackNumber: Number.isFinite(trackMeta.trackNumber) ? trackMeta.trackNumber : Number.MAX_SAFE_INTEGER,
-        coverUrl: coverRelativePath ? `/media/${encodeURIComponent(coverRelativePath)}` : null,
-        lyrics: lyricsByBase.get(stripExtension(fileName).toLowerCase()) || [],
-        orderKey: Number.isFinite(playlistOrder) ? playlistOrder : (Number.isFinite(trackMeta.trackNumber) ? trackMeta.trackNumber : Number.MAX_SAFE_INTEGER),
+        discNumber,
+        trackNumber: jsonTrack?.trackNumber ?? (Number.isFinite(trackMeta.trackNumber) ? trackMeta.trackNumber : Number.MAX_SAFE_INTEGER),
+        coverUrl: coverRelativePath ? `/media/${coverRelativePath.split('/').map(encodeURIComponent).join('/')}` : null,
+        lyrics: lyricsByBase.get(basenm.toLowerCase()) || [],
+        orderKey: Number.isFinite(playlistOrder) ? playlistOrder : (jsonTrack?.position ?? (Number.isFinite(trackMeta.trackNumber) ? trackMeta.trackNumber : Number.MAX_SAFE_INTEGER)),
+        duration: jsonTrack?.duration || undefined,
       }
     })
 
     parsedAlbumTracks.sort((a, b) => {
+      if (a.discNumber !== b.discNumber) return a.discNumber - b.discNumber
       if (a.orderKey !== b.orderKey) return a.orderKey - b.orderKey
       return a.filename.localeCompare(b.filename)
     })
@@ -212,7 +254,7 @@ async function scanLibrary() {
     for (const t of parsedAlbumTracks) {
       tracks.push({
         ...t,
-        url: `/media/${encodeURIComponent(t.relativePath)}`,
+        url: `/media/${t.relativePath.split('/').map(encodeURIComponent).join('/')}`,
       })
     }
   }
@@ -224,6 +266,7 @@ async function scanLibrary() {
     const albumCmp = a.album.localeCompare(b.album)
     if (albumCmp !== 0) return albumCmp
 
+    if (a.discNumber !== b.discNumber) return a.discNumber - b.discNumber
     if (a.orderKey !== b.orderKey) return a.orderKey - b.orderKey
 
     return a.filename.localeCompare(b.filename)

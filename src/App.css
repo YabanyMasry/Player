@@ -1,21 +1,9 @@
 .app {
   max-width: 860px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 80px 16px 16px 16px;
   display: grid;
   gap: 12px;
-}
-
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.topbar__actions {
-  display: flex;
-  gap: 8px;
 }
 
 .panel {

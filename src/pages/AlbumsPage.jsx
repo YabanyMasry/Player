@@ -7,7 +7,7 @@ export default function AlbumsPage() {
 
   return (
     <main className="panel albums-page">
-      <h2 style={{ marginBottom: '24px' }}>Albums</h2>
+      <h2 style={{ marginBottom: '24px' }}></h2>
       {albums.length === 0 ? (
         <p className="muted">No albums found.</p>
       ) : (

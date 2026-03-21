@@ -218,11 +218,23 @@ export function LocalPlayerProvider({ children }) {
 
     for (const album of byAlbum.values()) {
       album.tracks.sort((a, b) => {
+        const aDisc = a.discNumber || 1
+        const bDisc = b.discNumber || 1
+        if (aDisc !== bDisc) return aDisc - bDisc
+
         const aNum = Number.isFinite(a.trackNumber) ? a.trackNumber : Number.MAX_SAFE_INTEGER
         const bNum = Number.isFinite(b.trackNumber) ? b.trackNumber : Number.MAX_SAFE_INTEGER
         if (aNum !== bNum) return aNum - bNum
         return a.filename.localeCompare(b.filename)
       })
+
+      const discsMap = new Map()
+      for (const t of album.tracks) {
+        const d = t.discNumber || 1
+        if (!discsMap.has(d)) discsMap.set(d, [])
+        discsMap.get(d).push(t)
+      }
+      album.discs = Array.from(discsMap.entries()).map(([discNumber, tracks]) => ({ discNumber, tracks }))
     }
 
     return Array.from(byAlbum.values()).sort((a, b) => a.album.localeCompare(b.album))
@@ -258,7 +270,7 @@ export function LocalPlayerProvider({ children }) {
 
   return (
     <LocalPlayerContext.Provider value={value}>
-      <audio ref={audioRef} />
+      <audio ref={audioRef} crossOrigin="anonymous" />
       {children}
     </LocalPlayerContext.Provider>
   )

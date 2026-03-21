@@ -5,6 +5,7 @@ import './AlbumGridCarousel.css'
 export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
   const [comboMode, setComboMode] = useState('grid')
   const [comboCarouselIndex, setComboCarouselIndex] = useState(0)
+  const [revealedAlbumKey, setRevealedAlbumKey] = useState(null)
   
   const [targetSize, setTargetSize] = useState(() => 
     Math.min(window.innerWidth * 0.85, window.innerHeight * 0.85)
@@ -26,9 +27,18 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (comboMode === 'carousel') {
-        if (event.key === 'ArrowRight') setComboCarouselIndex(prev => Math.min(albums.length - 1, prev + 1))
-        if (event.key === 'ArrowLeft') setComboCarouselIndex(prev => Math.max(0, prev - 1))
-        if (event.key === 'Escape') handleComboBackToGrid()
+        if (event.key === 'ArrowRight') {
+          setComboCarouselIndex(prev => Math.min(albums.length - 1, prev + 1))
+          setRevealedAlbumKey(null)
+        }
+        if (event.key === 'ArrowLeft') {
+          setComboCarouselIndex(prev => Math.max(0, prev - 1))
+          setRevealedAlbumKey(null)
+        }
+        if (event.key === 'Escape') {
+          if (revealedAlbumKey) setRevealedAlbumKey(null)
+          else handleComboBackToGrid()
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -113,18 +123,19 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       otherGridEls,
       {
         opacity: 0,
-        duration: 0.3,
-        ease: 'power2.inOut',
-        stagger: 0.01,
+        scale: 0.8,
+        duration: 0.2,
+        ease: 'power2.in',
+        stagger: 0.005,
       },
       0
     )
     
     tl.to(comboGridWrapRef.current, {
       opacity: 0,
-      duration: 0.3,
-      ease: 'power2.in',
-    }, 0.1)
+      duration: 0.2,
+      ease: 'linear',
+    }, 0)
 
     tl.to(comboMorphRef.current, {
       scale: 1.05,
@@ -176,6 +187,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
     if (isComboTransitioningRef.current) return
 
     isComboTransitioningRef.current = true
+    setRevealedAlbumKey(null)
 
     const currentIndex = comboCarouselIndex
     const currentData = albums[currentIndex]
@@ -210,17 +222,10 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       width: startWidth,
       height: startHeight,
       backgroundImage: currentData.coverUrl ? `url("${currentData.coverUrl}")` : 'none',
-      backgroundColor: currentData.coverUrl ? 'transparent' : 'transparent',
+      backgroundColor: 'transparent',
       borderRadius: 0,
-      opacity: 1,
+      opacity: currentData.coverUrl ? 1 : 0, // don't show ghost morph if no cover (placeholder)
       zIndex: 1000,
-    })
-
-    gsap.set(comboGridWrapRef.current, { opacity: 1, pointerEvents: 'none' })
-
-    albums.forEach(item => {
-      const el = comboGridRefs.current[item.key]
-      if (el) gsap.set(el, { opacity: 0, scale: 1, x: 0, y: 0 })
     })
 
     const targetGridEl = comboGridRefs.current[currentData.key]
@@ -228,15 +233,30 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
     let destY = window.innerHeight / 2 - 110
     let destWidth = 220
     let destHeight = 220
+    let targetCoverEl = null
 
     if (targetGridEl) {
-      const targetCoverEl = targetGridEl.querySelector('.agc-cover, .agc-placeholder') || targetGridEl
+      targetCoverEl = targetGridEl.querySelector('.agc-cover, .agc-placeholder') || targetGridEl
       const targetRect = targetCoverEl.getBoundingClientRect()
       destX = targetRect.left
       destY = targetRect.top
       destWidth = targetRect.width
       destHeight = targetRect.height
     }
+
+    // Reset grid elements to full size/opacity instantly (within the invisible wrapper)
+    albums.forEach(item => {
+      const el = comboGridRefs.current[item.key]
+      if (el) gsap.set(el, { opacity: 1, scale: 1, x: 0, y: 0 })
+    })
+
+    // Hide target cover only if it's an image so morph doesn't overlap weirdly
+    if (targetCoverEl && currentData.coverUrl) {
+       gsap.set(targetCoverEl, { opacity: 0 })
+    }
+
+    // Prepare wrapper for fade in
+    gsap.set(comboGridWrapRef.current, { opacity: 0, pointerEvents: 'none' })
 
     const tl = gsap.timeline()
 
@@ -247,12 +267,6 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
     }, 0)
 
     tl.to(comboMorphRef.current, {
-      scale: 1.05,
-      duration: 0.18,
-      ease: 'power2.out',
-    }, 0.05)
-
-    tl.to(comboMorphRef.current, {
       x: destX,
       y: destY,
       width: destWidth,
@@ -261,32 +275,22 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       scale: 1,
       duration: 0.5,
       ease: 'power3.inOut',
-    }, 0.2)
+    }, 0)
 
-    const sortedEls = albums
-      .map((item, idx) => ({ item, idx, el: comboGridRefs.current[item.key] }))
-      .filter(({ el }) => Boolean(el))
-      .sort((a, b) => Math.abs(a.idx - currentIndex) - Math.abs(b.idx - currentIndex))
-      .map(({ el }) => el)
-
-    tl.to(comboMorphRef.current, {
-      opacity: 0,
-      duration: 0.25,
-      ease: 'power2.in',
-    }, 0.55)
-
-    tl.to(sortedEls, {
+    // Fade in the grid (seamlessly replacing the outgoing carousel + morph)
+    tl.to(comboGridWrapRef.current, {
       opacity: 1,
-      duration: 0.35,
-      ease: 'power2.out',
-      stagger: 0.02,
-    }, 0.5)
+      duration: 0.3,
+      ease: 'power2.inOut',
+    }, 0.2)
 
     tl.call(() => {
       setComboMode('grid')
       gsap.set(comboCarouselWrapRef.current, { opacity: 0, pointerEvents: 'none' })
       gsap.set(comboGridWrapRef.current, { opacity: 1, pointerEvents: 'auto' })
       gsap.set(comboMorphRef.current, { opacity: 0 })
+
+      if (targetCoverEl) gsap.set(targetCoverEl, { clearProps: 'opacity' })
 
       albums.forEach(item => {
         const el = comboGridRefs.current[item.key]
@@ -332,28 +336,62 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
         ref={comboCarouselWrapRef} 
         aria-hidden={comboMode !== 'carousel'}
         onClick={(e) => {
-          if (comboMode === 'carousel' && !e.target.closest('.agc-carousel-card')) {
-            handleComboBackToGrid()
+          if (comboMode === 'carousel') {
+            if (e.target.closest('.agc-tracklist-panel')) {
+              return
+            }
+            if (revealedAlbumKey) {
+              setRevealedAlbumKey(null)
+              return
+            }
+            if (!e.target.closest('.agc-carousel-card')) {
+              handleComboBackToGrid()
+            }
           }
         }}
       >
         <div className="agc-carousel-track" ref={comboTrackRef}>
           {albums.map(album => (
-            <article key={`agc-slide-${album.key}`} className="agc-slide">
-              <div
-                className="agc-carousel-card"
-                style={{
-                  width: targetSize,
-                  height: targetSize,
-                  backgroundImage: album.coverUrl ? `url("${album.coverUrl}")` : 'none',
-                  backgroundColor: album.coverUrl ? 'transparent' : 'transparent'
-                }}
-              >
-                {!album.coverUrl && (
-                  <div className="agc-placeholder" style={{ margin:0, height:'100%' }}>
-                    <span>🎵</span>
-                  </div>
-                )}
+            <article key={`agc-slide-${album.key}`} className={`agc-slide ${revealedAlbumKey === album.key ? 'agc-slide--revealed' : ''}`}>
+              <div className="agc-carousel-card-wrap">
+                <div className="agc-record-wrap" aria-hidden="true">
+                  <div className="agc-record-visual" />
+                </div>
+                <div
+                  className="agc-carousel-card"
+                  style={{
+                    width: targetSize,
+                    height: targetSize,
+                    backgroundImage: album.coverUrl ? `url("${album.coverUrl}")` : 'none',
+                    backgroundColor: album.coverUrl ? 'transparent' : 'transparent'
+                  }}
+                  onClick={() => {
+                    setRevealedAlbumKey(prev => prev === album.key ? null : album.key)
+                  }}
+                >
+                  {!album.coverUrl && (
+                    <div className="agc-placeholder" style={{ margin:0, height:'100%' }}>
+                      <span>🎵</span>
+                    </div>
+                  )}
+                </div>
+                
+                <aside className="agc-tracklist-panel">
+                  <h3>{album.album}</h3>
+                  <p>{album.artist}</p>
+                  <ul className="agc-tracklist">
+                    {album.tracks && album.tracks.map((track, i) => (
+                      <li 
+                        key={track.id || i} 
+                        className="agc-track-item"
+                        onClick={() => onPlayAlbum && onPlayAlbum(album.album)}
+                      >
+                        <span className="agc-track-num">{i + 1}</span>
+                        <span className="agc-track-name">{track.title || track.filename || 'Unknown Track'}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </aside>
               </div>
             </article>
           ))}

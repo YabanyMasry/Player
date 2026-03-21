@@ -1,5 +1,12 @@
 .albums-page {
-  padding: 24px;
+  position: fixed;
+  inset: 0;
+  top: 0; /* Full screen */
+  padding: 24px 48px; /* Push content down to avoid PillNav overlap */
+  background: var(--bg);
+  z-index: 5;
+  overflow-y: auto;
+  border: none !important;
+  border-radius: 0 !important;
+  padding-top: 55px !important;
 }
-
-
