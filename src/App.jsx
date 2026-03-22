@@ -3,17 +3,14 @@ import { useLocalPlayer } from './state/LocalPlayerContext'
 import PillNav from './components/PillNav'
 import AlbumsPage from './pages/AlbumsPage'
 import PlayerPage from './pages/PlayerPage'
-import TestPage from './pages/TestPage'
-import AudioTestPage from './pages/AudioTestPage'
 import VinylPlayerPage from './pages/VinylPlayerPage'
+import SettingsPage from './pages/SettingsPage'
 import './App.css'
 
 const navItems = [
   { href: '/albums', label: 'Albums' },
-  { href: '/player', label: 'Player' },
-  { href: '/test', label: 'Test' },
-  { href: '/audio-test', label: 'Audio Test' },
   { href: '/vinyl-player', label: 'Vinyl' },
+  { href: '/settings', label: 'Settings' },
 ]
 
 export default function App() {
@@ -33,10 +30,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/albums" replace />} />
         <Route path="/albums" element={<AlbumsPage />} />
-        <Route path="/player" element={<PlayerPage />} />
-        <Route path="/test" element={<TestPage />} />
-        <Route path="/audio-test" element={<AudioTestPage />} />
         <Route path="/vinyl-player" element={<VinylPlayerPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
 
       <footer className="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

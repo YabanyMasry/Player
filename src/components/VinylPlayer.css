@@ -2,38 +2,133 @@
 
 .vp-turntable {
   position: relative;
-  width: min(840px, 95vw);
-  height: min(560px, 65vh);
+  width: min(1050px, 95vw);
+  height: min(700px, 65vh);
   flex-shrink: 0;
   background: var(--surface, #1b1b1b);
-  border-radius: 0;
-  box-shadow: 2px 12px 50px rgba(0, 0, 0, 0.7);
+  border-radius: 12px;
+  box-shadow:
+    2px 12px 50px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border, #383838);
+}
+
+/* corner screws */
+.vp-screw {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #555, #222);
+  border: 1px solid #444;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+}
+
+.vp-screw::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 2px;
+  background: #333;
+  border-radius: 1px;
+  transform: translate(-50%, -50%) rotate(35deg);
+}
+
+.vp-screw--tl {
+  top: 18px;
+  left: 18px;
+}
+
+.vp-screw--tr {
+  top: 18px;
+  right: 18px;
+}
+
+.vp-screw--bl {
+  bottom: 18px;
+  left: 18px;
+}
+
+.vp-screw--br {
+  bottom: 18px;
+  right: 18px;
+}
+
+/* power indicator */
+.vp-power-dot {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid #444;
+  z-index: 3;
+  transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.vp-power-dot--on {
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+}
+
+.vp-power-dot--off {
+  background: #333;
+  box-shadow: none;
 }
 
 
 
 .vp-platter {
   position: absolute;
-  left: 40px;
+  left: 50px;
   top: 50%;
   transform: translateY(-50%);
-  width: min(500px, 60vh);
-  height: min(500px, 60vh);
+  width: min(625px, 60vh);
+  height: min(625px, 60vh);
   border-radius: 50%;
   background: #111;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow:
+    inset 0 0 30px rgba(0, 0, 0, 0.8),
+    0 0 0 3px #1a1a1a,
+    0 0 0 5px #0e0e0e;
+}
+
+/* thin ring highlight around the platter (like the reference sketch) */
+.vp-platter::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  pointer-events: none;
 }
 
 /* ── vinyl record ────────────────────────────────────────────── */
 
+.vp-vinyl-wrapper {
+  width: 95%;
+  height: 95%;
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform, opacity;
+}
+
 .vp-vinyl {
-  width: 90%;
-  height: 90%;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background: #1a1a1a;
   position: relative;
   display: flex;
   align-items: center;
@@ -41,18 +136,16 @@
   will-change: transform;
 }
 
-/* subtle groove rings */
-.vp-groove {
+.vp-vinyl-bg {
   position: absolute;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   pointer-events: none;
+  border-radius: 50%;
 }
-
-.vp-groove--1 { width: 85%; height: 85%; }
-.vp-groove--2 { width: 70%; height: 70%; }
-.vp-groove--3 { width: 55%; height: 55%; }
-.vp-groove--4 { width: 92%; height: 92%; }
 
 /* album label (center) */
 .vp-label {
@@ -71,21 +164,43 @@
 
 /* spindle hole */
 .vp-spindle {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #555, #222);
+  border: 1px solid #444;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* tonearm joint dots */
+.vp-tonearm-joint {
+  position: absolute;
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #333;
+  background: radial-gradient(circle at 40% 35%, #555, #222);
   border: 1px solid #444;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.vp-tonearm-joint--mid {
+  top: 130px;
+}
+
+.vp-tonearm-joint--end {
+  top: 250px;
 }
 
 /* ── tonearm matching sketch ────────────────────────────────────── */
 
 .vp-tonearm-pivot {
   position: absolute;
-  top: 140px;
-  right: 220px;
-  width: 10px;
-  height: 10px;
+  top: 150px;
+  right: 375px;
+  width: 12px;
+  height: 12px;
   transform: translate(50%, -50%);
   z-index: 5;
 }
@@ -94,45 +209,52 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 86px;
-  height: 86px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
-  border: 4px solid #555;
+  background-color: #131313;
   transform: translate(-50%, -50%);
   z-index: 10;
   pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
 .vp-tonearm {
   position: absolute;
-  top: 0; 
+  top: 0;
   left: 0;
-  width: 10px; 
-  height: 10px;
+  width: 12px;
+  height: 12px;
   transform-origin: center center;
   z-index: 8;
 }
 
 .vp-tonearm-wand {
   position: absolute;
-  top: -100px; /* extends upward beyond the pivot */
-  left: 1px; /* width 8px, center over 10px pivot */
-  width: 8px;
-  height: 310px;
+  top: -5px;
+  /* start at pivot (slightly above to tuck under ring) */
+  left: 1px;
+  /* center over 12px pivot */
+  width: 10px;
+  height: 268px;
   background: #ebebeb;
-  border-radius: 4px;
+  border-radius: 5px;
+  box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .vp-tonearm-bend {
   position: absolute;
-  top: 206px; /* From pivot downward to where the main wand bends */
-  left: 4px; /* center horizontally within 10px parent */
-  width: 8px;
-  height: 70px;
+  top: 257px;
+  /* From pivot downward to where the main wand bends */
+  left: 3px;
+  width: 10px;
+  height: 88px;
   background: #ebebeb;
-  border-radius: 4px;
+  border-radius: 5px;
   transform-origin: top center;
-  transform: rotate(40deg); /* Bends to the bottom-left */
+  transform: rotate(40deg);
+  /* Bends to the bottom-left */
+  box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .vp-tonearm-head {
@@ -140,27 +262,14 @@
   top: calc(100% - 2px);
   left: 50%;
   transform: translate(-50%, 0);
-  width: 24px;
-  height: 48px;
-  background: #181818;
-  border-radius: 6px;
-  border: 2px solid #555;
+  width: 30px;
+  height: 60px;
+  background: #131313;
+  border-radius: 8px;
+  box-shadow: 1px 3px 8px rgba(0, 0, 0, 0.6);
 }
 
-.vp-tonearm-head-detail {
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: 4px;
-  width: 2px;
-  background: #555;
-  border-radius: 2px;
-}
 
-.vp-tonearm-head-detail.right {
-  left: auto;
-  right: 4px;
-}
 
 /* ── digital display panels (bottom right) ────────────────────── */
 
@@ -169,19 +278,39 @@
   bottom: 40px;
   right: 50px;
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 20px;
   z-index: 2;
+  transform: scale(0.9);
+  transform-origin: bottom right;
+}
+
+@media (max-width: 900px) {
+  .vp-digital-displays {
+    transform: scale(0.7);
+    bottom: 30px;
+    right: 30px;
+  }
+}
+
+@media (max-width: 600px) {
+  .vp-digital-displays {
+    transform: scale(0.55);
+    bottom: 15px;
+    right: 20px;
+  }
 }
 
 .vp-digital-panel {
-  height: 60px;
+  height: 75px;
   background: #111;
   border: 1px solid #222;
   border-radius: 6px;
   display: flex;
   align-items: center;
-  padding: 6px 12px;
-  box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+  padding: 8px 15px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
 }
 
 .vp-digital-matrix {
@@ -189,11 +318,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  transform: scale(1.2);
 }
 
 .vp-digital-wave {
-  width: 160px;
+  width: 200px;
   height: 100%;
   position: relative;
 }
@@ -201,4 +331,170 @@
 .vp-digital-wave .el-live-waveform-wrapper {
   background: transparent !important;
   height: 100% !important;
+}
+
+/* ── sliders ──────────────────────────────────── */
+
+.vp-sliders-container {
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 20px 25px;
+  width: 260px;
+  box-sizing: border-box;
+  height: auto;
+}
+
+.vp-slider-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.vp-slider-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-family: monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.vp-slider-wrapper {
+  height: 140px;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.vp-slider-ticks {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: -2px;
+  width: 4px;
+  background: repeating-linear-gradient(to bottom,
+      rgba(255, 255, 255, 0.4) 0,
+      rgba(255, 255, 255, 0.4) 2px,
+      transparent 2px,
+      transparent calc(10% - 0.2px));
+  pointer-events: none;
+}
+
+.vp-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 170px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  outline: none;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+  transform: rotate(-90deg);
+}
+
+.vp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.vp-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+}
+
+.vp-scrolling-matrix .matrix-pixel {
+  transition: none !important;
+}
+
+/* ── horizontal fx sliders ──────────────────────────────────── */
+
+.vp-fx-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.vp-fx-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.vp-fx-label {
+  font-family: monospace;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  width: 25px;
+}
+
+.vp-slider-wrapper-hz {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.vp-slider-ticks-hz {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  bottom: -6px;
+  height: 4px;
+  background: repeating-linear-gradient(to right,
+      rgba(255, 255, 255, 0.4) 0,
+      rgba(255, 255, 255, 0.4) 2px,
+      transparent 2px,
+      transparent calc(10% - 0.2px));
+  pointer-events: none;
+}
+
+.vp-slider-hz {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+  outline: none;
+}
+
+.vp-slider-hz::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.vp-slider-hz::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
 }

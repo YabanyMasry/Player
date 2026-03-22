@@ -38,7 +38,7 @@ export function LiveWaveform({
         streamRef.current.getTracks().forEach(t => t.stop())
         streamRef.current = null
       }
-      if (audioContextRef.current) {
+      if (audioContextRef.current && !audioElement) {
         audioContextRef.current.close().catch(() => {})
         audioContextRef.current = null
       }
@@ -75,9 +75,15 @@ export function LiveWaveform({
           analyserRef.current = analyser
 
           const source = audioElement._waveformSource
-          source.disconnect() // prevent multi routing bugs
-          source.connect(analyser)
-          analyser.connect(ctx.destination) // Connect back to speakers
+          
+          if (audioElement._tapNode) {
+            audioElement._tapNode.connect(analyser)
+          } else {
+            source.disconnect() // prevent multi routing bugs
+            source.connect(analyser)
+            analyser.connect(ctx.destination) // Connect back to speakers
+          }
+          
           sourceRef.current = source
 
           const bufferLength = analyser.frequencyBinCount
@@ -126,10 +132,13 @@ export function LiveWaveform({
     return () => {
       isMounted = false
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
-      if (audioContextRef.current) audioContextRef.current.close().catch(() => {})
+      if (audioContextRef.current && !audioElement) {
+        audioContextRef.current.close().catch(() => {})
+        audioContextRef.current = null
+      }
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
     }
-  }, [active, fftSize])
+  }, [active, fftSize, audioElement])
 
   // Resize canvas handler
   useEffect(() => {

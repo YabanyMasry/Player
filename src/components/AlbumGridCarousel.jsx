@@ -1,9 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
+import vinylImage from '../assets/Vinyl.png'
+import coverOverlay1 from '../assets/1.png'
+import coverOverlay2 from '../assets/2.png'
+import coverOverlay3 from '../assets/3.png'
+import coverOverlay4 from '../assets/4.png'
+import coverOverlay5 from '../assets/5.png'
 import './AlbumGridCarousel.css'
+
+const overlays = [coverOverlay1, coverOverlay2, coverOverlay3, coverOverlay4, coverOverlay5]
+
+function getCookie(name) {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop().split(';').shift()
+  return null
+}
 
 export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
   const [comboMode, setComboMode] = useState('grid')
+  const enableTextures = getCookie('enableAlbumTextures') !== 'false'
   const [comboCarouselIndex, setComboCarouselIndex] = useState(0)
   const [revealedAlbumKey, setRevealedAlbumKey] = useState(null)
   
@@ -73,11 +89,11 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
     isComboTransitioningRef.current = true
 
     gsap.set(comboMorphRef.current, {
-      clearProps: 'transform,width,height,background,border,borderRadius,scale',
+      clearProps: 'transform,width,height,background,border,borderRadius,scale,-webkit-mask-image,-webkit-mask-size,mask-image,mask-size',
     })
     gsap.set(comboMorphRef.current, { opacity: 0, pointerEvents: 'none', zIndex: 1000 })
 
-    const coverEl = pickedGridEl.querySelector('.agc-cover, .agc-placeholder') || pickedGridEl
+    const coverEl = pickedGridEl.querySelector('.agc-cover-wrapper') || pickedGridEl
     const sourceRect = coverEl.getBoundingClientRect()
 
     gsap.set(comboTrackRef.current, { xPercent: -pickedIndex * 100 })
@@ -99,6 +115,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       tHeight = destRect.height
     }
 
+    const pickedOverlay = overlays[pickedIndex % 5]
     gsap.set(comboMorphRef.current, {
       x: sourceRect.left,
       y: sourceRect.top,
@@ -106,9 +123,16 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       height: sourceRect.height,
       backgroundImage: pickedData.coverUrl ? `url("${pickedData.coverUrl}")` : 'none',
       backgroundColor: pickedData.coverUrl ? 'transparent' : 'transparent',
+      WebkitMaskImage: enableTextures ? `url("${pickedOverlay}")` : 'none',
+      maskImage: enableTextures ? `url("${pickedOverlay}")` : 'none',
+      WebkitMaskSize: 'cover',
+      maskSize: 'cover',
       borderRadius: 0,
       opacity: 1,
     })
+    if (enableTextures) {
+      comboMorphRef.current.innerHTML = `<img src="${pickedOverlay}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; mix-blend-mode: screen; pointer-events: none; z-index: 2;" />`
+    }
 
     gsap.set(pickedGridEl, { opacity: 0 })
 
@@ -172,6 +196,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       gsap.set(comboGridWrapRef.current, { opacity: 0, pointerEvents: 'none' })
       gsap.set(comboCarouselWrapRef.current, { opacity: 1, pointerEvents: 'auto' })
       gsap.set(comboMorphRef.current, { opacity: 0 })
+      comboMorphRef.current.innerHTML = ''
 
       albums.forEach(item => {
         const el = comboGridRefs.current[item.key]
@@ -197,7 +222,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
     }
 
     gsap.set(comboMorphRef.current, {
-      clearProps: 'transform,width,height,background,border,borderRadius,scale',
+      clearProps: 'transform,width,height,background,border,borderRadius,scale,-webkit-mask-image,-webkit-mask-size,mask-image,mask-size',
     })
 
     const carouselCards = comboTrackRef.current.querySelectorAll('.agc-carousel-card')
@@ -216,6 +241,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       startHeight = sourceRect.height
     }
 
+    const pickedOverlay = overlays[currentIndex % 5]
     gsap.set(comboMorphRef.current, {
       x: startX,
       y: startY,
@@ -223,10 +249,17 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       height: startHeight,
       backgroundImage: currentData.coverUrl ? `url("${currentData.coverUrl}")` : 'none',
       backgroundColor: 'transparent',
+      WebkitMaskImage: enableTextures ? `url("${pickedOverlay}")` : 'none',
+      maskImage: enableTextures ? `url("${pickedOverlay}")` : 'none',
+      WebkitMaskSize: 'cover',
+      maskSize: 'cover',
       borderRadius: 0,
       opacity: currentData.coverUrl ? 1 : 0, // don't show ghost morph if no cover (placeholder)
       zIndex: 1000,
     })
+    if (enableTextures) {
+      comboMorphRef.current.innerHTML = `<img src="${pickedOverlay}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; mix-blend-mode: screen; pointer-events: none; z-index: 2;" />`
+    }
 
     const targetGridEl = comboGridRefs.current[currentData.key]
     let destX = document.documentElement.clientWidth / 2 - 110
@@ -236,7 +269,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
     let targetCoverEl = null
 
     if (targetGridEl) {
-      targetCoverEl = targetGridEl.querySelector('.agc-cover, .agc-placeholder') || targetGridEl
+      targetCoverEl = targetGridEl.querySelector('.agc-cover-wrapper') || targetGridEl
       const targetRect = targetCoverEl.getBoundingClientRect()
       destX = targetRect.left
       destY = targetRect.top
@@ -289,6 +322,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
       gsap.set(comboCarouselWrapRef.current, { opacity: 0, pointerEvents: 'none' })
       gsap.set(comboGridWrapRef.current, { opacity: 1, pointerEvents: 'auto' })
       gsap.set(comboMorphRef.current, { opacity: 0 })
+      comboMorphRef.current.innerHTML = ''
 
       if (targetCoverEl) gsap.set(targetCoverEl, { clearProps: 'opacity' })
 
@@ -316,13 +350,20 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
                 onClick={() => handleComboPick(album.key, idx)}
                 title={`View ${album.album} by ${album.artist}`}
               >
-                {album.coverUrl ? (
-                  <img src={album.coverUrl} alt={`${album.album} cover`} className="agc-cover" loading="lazy" />
-                ) : (
-                  <div className="agc-placeholder">
-                    <span>🎵</span>
-                  </div>
-                )}
+                <div className={enableTextures ? "agc-cover-wrapper" : ""} style={{
+                  WebkitMaskImage: enableTextures ? `url("${overlays[idx % 5]}")` : 'none',
+                  maskImage: enableTextures ? `url("${overlays[idx % 5]}")` : 'none',
+                  position: 'relative', width: '100%', aspectRatio: '1/1', overflow: 'hidden'
+                }}>
+                  {album.coverUrl ? (
+                    <img src={album.coverUrl} alt={`${album.album} cover`} className="agc-cover" loading="lazy" />
+                  ) : (
+                    <div className="agc-placeholder">
+                      <span>🎵</span>
+                    </div>
+                  )}
+                  {enableTextures && <img src={overlays[idx % 5]} alt="" className="agc-cover-overlay" />}
+                </div>
               </button>
             </li>
           ))}
@@ -351,29 +392,44 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
         }}
       >
         <div className="agc-carousel-track" ref={comboTrackRef}>
-          {albums.map(album => (
+          {albums.map((album, idx) => (
             <article key={`agc-slide-${album.key}`} className={`agc-slide ${revealedAlbumKey === album.key ? 'agc-slide--revealed' : ''}`}>
               <div className="agc-carousel-card-wrap">
                 <div className="agc-record-wrap" aria-hidden="true">
-                  <div className="agc-record-visual" />
+                  <div className="agc-record-visual">
+                    <img src={vinylImage} alt="Vinyl Record" className="agc-record-bg" />
+                    <div
+                      className="agc-record-label"
+                      style={{
+                        backgroundImage: album.coverUrl ? `url("${album.coverUrl}")` : undefined,
+                        background: (!album.coverUrl) ? 'linear-gradient(135deg, #2a2a5a, #1a1a3a)' : undefined,
+                      }}
+                    >
+                      <div className="agc-record-spindle" />
+                    </div>
+                  </div>
                 </div>
                 <div
-                  className="agc-carousel-card"
+                  className={`agc-carousel-card ${enableTextures ? 'agc-cover-wrapper' : ''}`}
                   style={{
                     width: targetSize,
                     height: targetSize,
-                    backgroundImage: album.coverUrl ? `url("${album.coverUrl}")` : 'none',
-                    backgroundColor: album.coverUrl ? 'transparent' : 'transparent'
+                    WebkitMaskImage: enableTextures ? `url("${overlays[idx % 5]}")` : 'none',
+                    maskImage: enableTextures ? `url("${overlays[idx % 5]}")` : 'none',
+                    position: 'relative', overflow: 'hidden'
                   }}
                   onClick={() => {
                     setRevealedAlbumKey(prev => prev === album.key ? null : album.key)
                   }}
                 >
-                  {!album.coverUrl && (
+                  {album.coverUrl ? (
+                    <img src={album.coverUrl} alt="" className="agc-cover" />
+                  ) : (
                     <div className="agc-placeholder" style={{ margin:0, height:'100%' }}>
                       <span>🎵</span>
                     </div>
                   )}
+                  {enableTextures && <img src={overlays[idx % 5]} alt="" className="agc-cover-overlay" />}
                 </div>
                 
                 <aside className="agc-tracklist-panel">

@@ -25,6 +25,7 @@ export default function VinylPlayerPage() {
     audioRef,
     duration,
     volume,
+    playbackRate,
     hasPrev,
     hasNext,
     selectTrack,
@@ -33,8 +34,15 @@ export default function VinylPlayerPage() {
     nextTrack,
     seek,
     setVolume,
+    setPlaybackRate,
     playAlbum,
+    audioEffects,
+    setAudioEffects,
   } = useLocalPlayer()
+
+  const handleEffectChange = useCallback((key, value) => {
+    setAudioEffects(prev => ({ ...prev, [key]: value }))
+  }, [setAudioEffects])
 
 
 
@@ -58,9 +66,17 @@ export default function VinylPlayerPage() {
       <div className="vp-stage">
         <VinylPlayer 
           isPlaying={isPlaying} 
-          coverUrl={currentAlbum?.coverUrl} 
+          coverUrl={currentTrack?.coverUrl || currentAlbum?.coverUrl} 
           audioElement={audioRef?.current}
           trackNumber={relativeTrackNum}
+          songName={currentTrack?.title || currentTrack?.filename || 'Unknown'}
+          albumName={currentAlbum?.album || ''}
+          volume={volume}
+          onVolumeChange={setVolume}
+          playbackRate={playbackRate}
+          onPlaybackRateChange={setPlaybackRate}
+          audioEffects={audioEffects}
+          onEffectChange={handleEffectChange}
         />
 
         {/* ── right tracklist ── */}
