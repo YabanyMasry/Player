@@ -36,6 +36,8 @@
   padding: 24px;
   overflow-y: auto;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .vp-tracklist-panel h3 {
@@ -116,17 +118,7 @@
 
 /* custom scrollbar */
 .vp-tracklist-panel::-webkit-scrollbar {
-  width: 6px;
-}
-.vp-tracklist-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-.vp-tracklist-panel::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
-.vp-tracklist-panel::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  display: none;
 }
 
 

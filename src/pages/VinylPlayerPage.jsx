@@ -58,6 +58,20 @@ export default function VinylPlayerPage() {
 
   /* ── progress ──────────────────────────────────────────────── */
 
+  const onPrevAlbum = useCallback(() => {
+    if (!currentAlbum || albums.length === 0) return;
+    const currentIdx = albums.findIndex(a => a.album === currentAlbum.album);
+    const prevIdx = (currentIdx - 1 + albums.length) % albums.length;
+    playAlbum(albums[prevIdx].album);
+  }, [albums, currentAlbum, playAlbum]);
+
+  const onNextAlbum = useCallback(() => {
+    if (!currentAlbum || albums.length === 0) return;
+    const currentIdx = albums.findIndex(a => a.album === currentAlbum.album);
+    const nextIdx = (currentIdx + 1) % albums.length;
+    playAlbum(albums[nextIdx].album);
+  }, [albums, currentAlbum, playAlbum]);
+
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
@@ -77,6 +91,12 @@ export default function VinylPlayerPage() {
           onPlaybackRateChange={setPlaybackRate}
           audioEffects={audioEffects}
           onEffectChange={handleEffectChange}
+          onPrevAlbum={onPrevAlbum}
+          onNextAlbum={onNextAlbum}
+          onTogglePlay={togglePlay}
+          lyrics={currentTrack?.lyrics}
+          currentTime={currentTime}
+          onSeek={seek}
         />
 
         {/* ── right tracklist ── */}

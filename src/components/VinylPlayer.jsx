@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react'
 import gsap from 'gsap'
 import { Matrix, digits } from './ElevenLabsMatrix'
 import { LiveWaveform } from './ElevenLabsLiveWaveform'
+import ImageDotMatrix from './ImageDotMatrix'
 import vinylImage from '../assets/Vinyl.png'
 import './VinylPlayer.css'
 
@@ -105,19 +106,71 @@ function cleanTitle(title) {
   return cleaned.substring(0, 30);
 }
 
-export default function VinylPlayer({ isPlaying, coverUrl, className = '', audioElement, trackNumber = 1, songName = '', albumName = '', volume = 0.8, onVolumeChange, playbackRate = 1, onPlaybackRateChange, audioEffects = {}, onEffectChange }) {
+// ============================================================================
+// PERFORMANCE FIX 1: Isolate the 1-second interval so it doesn't re-render the whole player
+// ============================================================================
+const StatusPulse = ({ isPlaying }) => {
+  const [pulse, setPulse] = useState(1);
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => setPulse(p => p === 1 ? 0.2 : 1), 1000);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  return (
+    <Matrix
+      rows={1} cols={1} pattern={isPlaying ? [[pulse]] : [[0.1]]}
+      size={6} gap={0}
+      palette={{ on: '#ffffff', off: 'rgba(255, 255, 255, 0.15)' }}
+    />
+  );
+};
+
+export default function VinylPlayer({ isPlaying, coverUrl, className = '', audioElement, trackNumber = 1, songName = '', albumName = '', volume = 0.8, onVolumeChange, playbackRate = 1, onPlaybackRateChange, audioEffects = {}, onEffectChange, onPrevAlbum, onNextAlbum, onTogglePlay, lyrics = [], currentTime = 0, onSeek }) {
+  const [showLyrics, setShowLyrics] = useState(false);
+  const lyricsContainerRef = useRef(null);
+
   const vinylColor = useMemo(() => {
     const idx = hashStr(albumName || songName || 'default') % VINYL_COLORS.length
     return VINYL_COLORS[idx]
   }, [albumName, songName])
-  const [pulse, setPulse] = useState(1)
 
+  // Calculate active lyric index
+  const activeIndex = useMemo(() => {
+    if (!lyrics || lyrics.length === 0) return -1;
+    let index = -1;
+    for (let i = 0; i < lyrics.length; i++) {
+      if (currentTime >= lyrics[i].time) {
+        index = i;
+      } else {
+        break;
+      }
+    }
+    return index;
+  }, [lyrics, currentTime]);
+
+  // ============================================================================
+  // PERFORMANCE FIX 2: Spotify-style smooth GSAP scrolling (No clunky native jumps)
+  // ============================================================================
   useEffect(() => {
-    const pulseInterval = setInterval(() => {
-      setPulse((prev) => (prev === 1 ? 0.2 : 1))
-    }, 1000)
-    return () => clearInterval(pulseInterval)
-  }, [])
+    if (showLyrics && lyricsContainerRef.current && activeIndex !== -1) {
+      const container = lyricsContainerRef.current;
+      const activeEl = container.children[activeIndex];
+
+      if (activeEl) {
+        // Calculate exact center position
+        const targetScrollTop = activeEl.offsetTop - (container.clientHeight / 2) + (activeEl.clientHeight / 2);
+
+        // Use GSAP for buttery smooth scrolling that doesn't stutter on React renders
+        gsap.to(container, {
+          scrollTop: targetScrollTop,
+          duration: 0.6,
+          ease: 'power2.out',
+          overwrite: 'auto'
+        });
+      }
+    }
+  }, [activeIndex, showLyrics]);
 
   const vinylRef = useRef(null)
   const vinylWrapperRef = useRef(null)
@@ -144,7 +197,7 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
     }
   }, [isPlaying])
 
-  const triggerDropAnimation = () => {
+  useEffect(() => {
     if (!vinylWrapperRef.current) return
     gsap.fromTo(vinylWrapperRef.current, {
       y: -400,
@@ -158,10 +211,6 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
       ease: 'power3.out',
       overwrite: 'auto'
     })
-  }
-
-  useEffect(() => {
-    triggerDropAnimation()
   }, [])
 
   useEffect(() => {
@@ -182,6 +231,29 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
   const viewCols = 48;
   const txtFrames = useMemo(() => createTextFrames(cleanTitle(songName), viewCols), [songName]);
 
+  // ============================================================================
+  // PERFORMANCE FIX 3: Memoize heavy Canvas/Matrix components to stop lag spikes
+  // ============================================================================
+  const MemoizedCoverMatrix = useMemo(() => (
+    coverUrl ? (
+      <ImageDotMatrix
+        src={coverUrl}
+        cols={8} rows={8} dotSize={10} gap={1.5} opacity={0.9} width="100%" height="100%"
+      />
+    ) : (
+      <div style={{ color: 'rgba(255,255,255,0.05)', fontSize: '24px' }}>🎵</div>
+    )
+  ), [coverUrl]);
+
+  const MemoizedScrollingTitle = useMemo(() => (
+    <Matrix
+      className="vp-scrolling-matrix"
+      rows={7} cols={viewCols} frames={txtFrames}
+      fps={15} size={3.5} gap={1}
+      palette={{ on: '#ffffff', off: 'rgba(255,255,255,0.15)' }}
+    />
+  ), [txtFrames]);
+
   return (
     <div className={`vp-turntable ${className}`}>
       {/* decorative corner screws */}
@@ -195,17 +267,10 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
 
       {/* platter base */}
       <div className="vp-platter">
-        {/* spinning vinyl */}
         <div className="vp-vinyl-wrapper" ref={vinylWrapperRef}>
           <div className="vp-vinyl" ref={vinylRef}>
             <img src={vinylImage} alt="Vinyl Record" className="vp-vinyl-bg" />
-            {/* album label */}
-            <div
-              className="vp-label"
-              style={{
-                background: `linear-gradient(135deg, ${vinylColor[0]}, ${vinylColor[1]})`,
-              }}
-            >
+            <div className="vp-label" style={{ background: `linear-gradient(135deg, ${vinylColor[0]}, ${vinylColor[1]})` }}>
               <div className="vp-spindle" />
             </div>
           </div>
@@ -216,156 +281,218 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
       <div className="vp-tonearm-pivot">
         <div className="vp-pivot-ring" />
         <div className="vp-tonearm" ref={tonearmRef}>
-          <div className="vp-tonearm-wand">
-
-          </div>
+          <div className="vp-tonearm-wand"></div>
           <div className="vp-tonearm-bend">
-            <div className="vp-tonearm-head">
-
-            </div>
+            <div className="vp-tonearm-head"></div>
           </div>
         </div>
       </div>
 
-
-
       {/* digital interface bottom right */}
       <div className="vp-digital-displays">
-        {/* Scrolling Track Matrix (Top-most) */}
-        <div className="vp-digital-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', width: '260px', height: 'auto', minHeight: '62px', boxSizing: 'border-box', overflow: 'hidden' }}>
+        {/* Unified Album Navigation Control (Top) */}
+        <div style={{ display: 'flex', gap: '18px', marginBottom: '0px', marginRight: '55px', justifyContent: 'center', position: 'relative', zIndex: 50 }}>
+          <button
+            className="vp-retro-btn"
+            onClick={(e) => { e.stopPropagation(); onPrevAlbum?.(); }}
+            title="Previous Album"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+
+          <button
+            className="vp-retro-btn"
+            onClick={(e) => { e.stopPropagation(); onTogglePlay?.(); }}
+            title="Play/Pause"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+              <line x1="12" y1="2" x2="12" y2="12"></line>
+            </svg>
+          </button>
+
+          <button
+            className="vp-retro-btn"
+            onClick={(e) => { e.stopPropagation(); onNextAlbum?.(); }}
+            title="Next Album"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+
+          <button
+            className="vp-retro-btn"
+            style={{ color: showLyrics ? '#fff' : '' }}
+            onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
+            title="Toggle Lyrics"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </button>
+        </div>
+
+        {/* Scrolling Track Matrix (Top-most) - ALWAYS VISIBLE */}
+        <div className="vp-digital-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', width: '260px', height: 'auto', minHeight: '62px', boxSizing: 'border-box', overflow: 'hidden', marginTop: '12px', alignSelf: 'flex-end' }}>
           <div style={{ display: 'flex' }}>
-            <Matrix
-              className="vp-scrolling-matrix"
-              rows={7}
-              cols={viewCols}
-              frames={txtFrames}
-              fps={15}
-              size={3.5}
-              gap={1}
-              palette={{ on: '#ffffff', off: 'rgba(255,255,255,0.15)' }}
-            />
+            {MemoizedScrollingTitle}
           </div>
         </div>
 
-        {/* Audio Mixing Sliders Panel (Middle) */}
-        <div className="vp-digital-panel vp-sliders-container">
-          <div className="vp-slider-group">
-            <span className="vp-slider-label">VOL</span>
-            <div className="vp-slider-wrapper">
-              <div className="vp-slider-ticks" />
-              <input type="range" className="vp-slider" min="0" max="100" step="10"
-                value={Math.round(volume * 100)}
-                onChange={e => onVolumeChange?.(Number(e.target.value) / 100)}
-              />
-            </div>
-          </div>
-          <div className="vp-slider-group">
-            <span className="vp-slider-label">PTC</span>
-            <div className="vp-slider-wrapper">
-              <div className="vp-slider-ticks" />
-              <input type="range" className="vp-slider" min="50" max="150" step="10"
-                value={Math.round(playbackRate * 100)}
-                onChange={e => onPlaybackRateChange?.(Number(e.target.value) / 100)}
-              />
-            </div>
-          </div>
-          <div className="vp-slider-group">
-            <span className="vp-slider-label">BASS</span>
-            <div className="vp-slider-wrapper">
-              <div className="vp-slider-ticks" />
-              <input type="range" className="vp-slider" min="-12" max="12" step="2.4"
-                value={audioEffects.eqLow ?? 0}
-                onChange={e => onEffectChange?.('eqLow', Number(e.target.value))}
-              />
-            </div>
-          </div>
-          <div className="vp-slider-group">
-            <span className="vp-slider-label">TRB</span>
-            <div className="vp-slider-wrapper">
-              <div className="vp-slider-ticks" />
-              <input type="range" className="vp-slider" min="-12" max="12" step="2.4"
-                value={audioEffects.eqHigh ?? 0}
-                onChange={e => onEffectChange?.('eqHigh', Number(e.target.value))}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Horizontal FX Sliders Panel */}
-        <div className="vp-digital-panel" style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', width: '260px', height: 'auto', boxSizing: 'border-box' }}>
-          <div className="vp-fx-container">
-            <div className="vp-fx-group">
-              <span className="vp-fx-label">REV</span>
-              <div className="vp-slider-wrapper-hz">
-                <div className="vp-slider-ticks-hz" />
-                <input type="range" className="vp-slider-hz" min="0" max="1" step="0.1"
-                  value={audioEffects.reverb ?? 0}
-                  onChange={e => onEffectChange?.('reverb', Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="vp-fx-group">
-              <span className="vp-fx-label">DLY</span>
-              <div className="vp-slider-wrapper-hz">
-                <div className="vp-slider-ticks-hz" />
-                <input type="range" className="vp-slider-hz" min="0" max="1" step="0.1"
-                  value={audioEffects.delay ?? 0}
-                  onChange={e => onEffectChange?.('delay', Number(e.target.value))}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Unified Screen Panel (Bottom) */}
-        <div className="vp-digital-panel" style={{ flexDirection: 'column', gap: '16px', padding: '16px 20px', height: 'auto', width: '260px', boxSizing: 'border-box' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-            {/* Status readouts */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                Status
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Matrix
-                  rows={1} cols={1} pattern={isPlaying ? [[pulse]] : [[0.1]]}
-                  size={6} gap={0}
-                  palette={{ on: '#ffffff', off: 'rgba(255, 255, 255, 0.15)' }}
-                />
-                <span style={{ color: '#e0e0e0', fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                  {isPlaying ? 'Playing' : 'Paused'}
-                </span>
-              </div>
-            </div>
-
-            {/* Track readouts */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                Track
-              </div>
-              <div className="vp-digital-matrix" style={{ transform: 'none', gap: '4px', display: 'flex' }}>
-                {countDigits.map((digit, index) => (
-                  <Matrix
-                    key={index}
-                    rows={7}
-                    cols={5}
-                    pattern={digits[digit]}
-                    size={5}
-                    gap={1.5}
-                  />
-                ))}
-              </div>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', marginTop: '12px', height: '450px' }}>
+          {/* Left Column: Permanent Cover Monitor */}
+          <div className="vp-digital-panel" style={{ flexDirection: 'column', gap: '4px', padding: '14px', height: '108px', width: '108px', boxSizing: 'border-box', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {MemoizedCoverMatrix}
             </div>
           </div>
 
-          <div className="vp-digital-wave" style={{ width: '100%', height: '50px' }}>
-            <LiveWaveform
-              active={isPlaying}
-              mode="scrolling"
-              audioElement={audioElement}
-              color="#ffffff"
-              barWidth={2}
-              barGap={2}
-            />
+          {/* Right Column: Switching Control/Display Area */}
+          <div style={{ width: '260px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {showLyrics ? (
+              <div
+                ref={lyricsContainerRef}
+                className="vp-digital-panel vp-lyrics-container"
+                style={{
+                  padding: '45px 20px', width: '100%', height: '100%', boxSizing: 'border-box',
+                  display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto'
+                }}
+              >
+                {lyrics.length > 0 ? (
+                  lyrics.map((line, idx) => {
+                    const isCurrent = idx === activeIndex;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => onSeek?.(line.time)}
+                        style={{
+                          color: isCurrent ? '#fff' : 'rgba(255,255,255,0.25)',
+                          fontSize: '18px',
+                          lineHeight: '1.4',
+                          fontFamily: "'Doto', sans-serif",
+                          fontWeight: isCurrent ? 600 : 400,
+                          letterSpacing: '0.01em',
+                          transition: 'color 0.4s ease, font-weight 0.4s ease', // Stripped heavy transitions for extreme smoothness
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          padding: '12px 0'
+                        }}
+                      >
+                        {line.text}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '14px', fontFamily: "'Doto', sans-serif", textAlign: 'center', padding: '20px' }}>No lyrics found.</div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Audio Mixing Sliders Panel */}
+                <div className="vp-digital-panel vp-sliders-container" style={{ height: '200px', flexShrink: 0 }}>
+                  <div className="vp-slider-group">
+                    <span className="vp-slider-label">VOL</span>
+                    <div className="vp-slider-wrapper">
+                      <div className="vp-slider-ticks" />
+                      <input type="range" className="vp-slider" min="0" max="100" step="10"
+                        value={Math.round(volume * 100)} onChange={e => onVolumeChange?.(Number(e.target.value) / 100)}
+                      />
+                    </div>
+                  </div>
+                  <div className="vp-slider-group">
+                    <span className="vp-slider-label">PTC</span>
+                    <div className="vp-slider-wrapper">
+                      <div className="vp-slider-ticks" />
+                      <input type="range" className="vp-slider" min="50" max="150" step="10"
+                        value={Math.round(playbackRate * 100)} onChange={e => onPlaybackRateChange?.(Number(e.target.value) / 100)}
+                      />
+                    </div>
+                  </div>
+                  <div className="vp-slider-group">
+                    <span className="vp-slider-label">BASS</span>
+                    <div className="vp-slider-wrapper">
+                      <div className="vp-slider-ticks" />
+                      <input type="range" className="vp-slider" min="-12" max="12" step="2.4"
+                        value={audioEffects.eqLow ?? 0} onChange={e => onEffectChange?.('eqLow', Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  <div className="vp-slider-group">
+                    <span className="vp-slider-label">TRB</span>
+                    <div className="vp-slider-wrapper">
+                      <div className="vp-slider-ticks" />
+                      <input type="range" className="vp-slider" min="-12" max="12" step="2.4"
+                        value={audioEffects.eqHigh ?? 0} onChange={e => onEffectChange?.('eqHigh', Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Horizontal FX Sliders Panel */}
+                <div className="vp-digital-panel" style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', width: '100%', height: '70px', flexShrink: 0, boxSizing: 'border-box' }}>
+                  <div className="vp-fx-container">
+                    <div className="vp-fx-group">
+                      <span className="vp-fx-label">REV</span>
+                      <div className="vp-slider-wrapper-hz">
+                        <div className="vp-slider-ticks-hz" />
+                        <input type="range" className="vp-slider-hz" min="0" max="1" step="0.1"
+                          value={audioEffects.reverb ?? 0} onChange={e => onEffectChange?.('reverb', Number(e.target.value))}
+                        />
+                      </div>
+                    </div>
+                    <div className="vp-fx-group">
+                      <span className="vp-fx-label">DLY</span>
+                      <div className="vp-slider-wrapper-hz">
+                        <div className="vp-slider-ticks-hz" />
+                        <input type="range" className="vp-slider-hz" min="0" max="1" step="0.1"
+                          value={audioEffects.delay ?? 0} onChange={e => onEffectChange?.('delay', Number(e.target.value))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status/Waveform Panel (Bottom) */}
+                <div className="vp-digital-panel" style={{ flexDirection: 'column', gap: '16px', padding: '16px 20px', minHeight: '160px', flexShrink: 0, width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                    {/* Status readouts */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                        Status
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <StatusPulse isPlaying={isPlaying} />
+                        <span style={{ color: '#e0e0e0', fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                          {isPlaying ? 'Playing' : 'Paused'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Track readouts */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', fontSize: '9px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                        Track
+                      </div>
+                      <div className="vp-digital-matrix" style={{ transform: 'none', gap: '4px', display: 'flex' }}>
+                        {countDigits.map((digit, index) => (
+                          <Matrix key={index} rows={7} cols={5} pattern={digits[digit]} size={5} gap={1.5} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="vp-digital-wave" style={{ width: '100%', height: '50px' }}>
+                    <LiveWaveform
+                      active={isPlaying} mode="scrolling" audioElement={audioElement} color="#ffffff" barWidth={2} barGap={2}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

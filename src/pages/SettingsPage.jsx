@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocalPlayer } from '../state/LocalPlayerContext';
+import './SettingsPage.css'; // Don't forget to import the CSS!
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -14,10 +15,35 @@ function setCookie(name, value, days = 365) {
   document.cookie = `${name}=${value};expires=${d.toUTCString()};path=/`;
 }
 
+// ----------------------------------------------------------------------------
+// Reusable Fader Component for DRY code
+// ----------------------------------------------------------------------------
+const RetroFader = ({ label, value, min, max, step, onChange, unit = "", highlightColor = "#38bdf8", description }) => (
+  <div style={{ marginBottom: '24px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
+      <div>
+        <span style={{ fontWeight: '600', color: '#ccc', letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.85rem' }}>{label}</span>
+        {description && <div style={{ color: '#666', fontSize: '0.75rem', marginTop: '4px' }}>{description}</div>}
+      </div>
+      <span className="lcd-readout" style={{ color: highlightColor, fontWeight: 'bold', fontSize: '0.9rem' }}>
+        {value}{unit}
+      </span>
+    </div>
+    <input 
+      type="range" 
+      className="retro-fader" 
+      min={min} 
+      max={max} 
+      step={step} 
+      value={value} 
+      onChange={onChange} 
+    />
+  </div>
+);
+
 export default function SettingsPage() {
   const [texturesEnabled, setTexturesEnabled] = useState(true);
   
-  // This hook context passes down the global state of the audio chain
   const { audioEffects, setAudioEffects, playbackRate, setPlaybackRate } = useLocalPlayer();
 
   useEffect(() => {
@@ -38,149 +64,124 @@ export default function SettingsPage() {
     setAudioEffects(prev => ({ ...prev, [key]: parseFloat(value) }));
   };
 
+  const handleResetDefaults = () => {
+    setPlaybackRate(1);
+    setAudioEffects({
+      eqHigh: 0, eqMid: 0, eqLow: 0, 
+      distortion: 0, reverb: 0, vinylCrackle: 0, 
+      pitchShift: 0, chorus: 0, phaser: 0, 
+      bitCrusher: 0, delay: 0
+    });
+  };
+
   return (
-    <div style={{ padding: '40px', color: '#fff', maxWidth: '800px', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: '40px' }}>Settings</h1>
+    <div style={{ padding: '40px 20px', color: '#e0e0e0', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
       
-      <div style={{ marginBottom: '40px', background: 'rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
-        <h2 style={{ fontSize: '1.4rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', marginBottom: '20px' }}>Visual Settings</h2>
-        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '12px' }}>
-          <input 
-            type="checkbox" 
-            checked={texturesEnabled} 
-            onChange={handleToggle} 
-            style={{ width: '20px', height: '20px', accentColor: '#38bdf8' }}
-          />
-          <span style={{ fontSize: '1.1rem' }}>Enable Album Vinyl Textures</span>
-        </label>
-        <p style={{ marginTop: '10px', color: '#aaa', fontSize: '0.9rem', lineHeight: '1.4' }}>
-          Turns on or off the custom Photoshop-style overlay effects for the album covers inside the grids and carousels.
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+        <h1 style={{ margin: 0, fontSize: '2rem', letterSpacing: '0.05em', color: '#fff' }}>SYSTEM SETUP</h1>
+        
+        {/* Hardware Reset Button */}
+        <button 
+          onClick={handleResetDefaults}
+          style={{
+            background: 'linear-gradient(145deg, #222, #111)',
+            border: '1px solid #000',
+            color: '#888',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontFamily: 'monospace',
+            textTransform: 'uppercase',
+            fontSize: '0.8rem',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.5), inset 1px 1px 1px rgba(255,255,255,0.05)',
+            transition: 'all 0.1s'
+          }}
+          onMouseDown={(e) => e.currentTarget.style.boxShadow = 'inset 2px 2px 5px rgba(0,0,0,0.8)'}
+          onMouseUp={(e) => e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.5), inset 1px 1px 1px rgba(255,255,255,0.05)'}
+        >
+          Reset to Analog Defaults
+        </button>
+      </div>
+      
+      {/* Visual Settings Rack */}
+      <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
+        <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Visual Outputs
+        </h2>
+        
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px' }}>
+          <label className="retro-toggle-wrapper" style={{ flexShrink: 0, marginTop: '2px' }}>
+            <input type="checkbox" checked={texturesEnabled} onChange={handleToggle} />
+            <span className="retro-toggle-slider"></span>
+          </label>
+          <div>
+            <div style={{ fontSize: '1.1rem', fontWeight: '500', color: '#fff', marginBottom: '4px' }}>Enable Album Vinyl Textures</div>
+            <div style={{ color: '#777', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              Engages the custom overlay engines for album covers inside grids and carousels, simulating light reflection and physical wear.
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div style={{ background: 'rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
-        <h2 style={{ fontSize: '1.4rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', marginBottom: '24px' }}>Audio Mastering & Pedalboard (Tone.js)</h2>
-        
-        <p style={{ marginTop: '0', marginBottom: '24px', color: '#aaa', fontSize: '0.9rem', lineHeight: '1.4' }}>
-          Your global master bus is routed directly through a Tone.js multi-node limiter block. Dial in effects without clipping!
+      {/* Audio Engine Rack */}
+      <div className="settings-rack-panel" style={{ padding: '30px' }}>
+        <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          DSP Master Bus
+        </h2>
+        <p style={{ marginTop: '0', marginBottom: '32px', color: '#666', fontSize: '0.85rem', lineHeight: '1.5', fontStyle: 'italic' }}>
+          Audio routed through multi-node Tone.js limiter block. Adjustments apply globally to the playback engine.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 40px' }}>
           
-          {/* Tape Speed / Playback Rate */}
-          <div style={{ padding: '16px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontWeight: 'bold' }}>Analog Tape Speed (Playback Rate)</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{playbackRate.toFixed(2)}x</span>
-            </div>
-            <p style={{ marginTop: '0', marginBottom: '12px', color: '#888', fontSize: '0.85rem' }}>
-              Like slowing down a real tape, modifying this fundamentally bends the interval and cadence simultaneously. 
-            </p>
-            <input type="range" min="0.25" max="2" step="0.05" value={playbackRate} onChange={(e) => setPlaybackRate(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* Pitch Shift */}
+          {/* Left Column */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>Digital Pitch Shift</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{audioEffects.pitchShift} semitones</span>
-            </div>
-            <p style={{ marginTop: '0', marginBottom: '12px', color: '#888', fontSize: '0.85rem' }}>
-              Uses a phase vocoder to shift the pitch completely independently of the time/speed.
-            </p>
-            <input type="range" min="-12" max="12" step="1" value={audioEffects.pitchShift} onChange={(e) => handleEffectChange('pitchShift', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
+            <RetroFader 
+              label="Tape Speed (Rate)" 
+              value={playbackRate.toFixed(2)} 
+              min="0.25" max="2" step="0.05" 
+              onChange={(e) => setPlaybackRate(parseFloat(e.target.value))} 
+              unit="x"
+              description="Physically slows the read speed, dropping pitch and tempo."
+            />
+            
+            <RetroFader 
+              label="Digital Pitch Shift" 
+              value={audioEffects.pitchShift} 
+              min="-12" max="12" step="1" 
+              onChange={(e) => handleEffectChange('pitchShift', e.target.value)} 
+              unit=" st"
+              description="Phase vocoder shifting independent of playback time."
+            />
+
+            <div style={{ height: '1px', background: '#222', margin: '24px 0' }} /> {/* Divider */}
+
+            <RetroFader label="EQ High (Treble)" value={audioEffects.eqHigh} min="-24" max="24" step="1" onChange={(e) => handleEffectChange('eqHigh', e.target.value)} unit=" dB" />
+            <RetroFader label="EQ Mid" value={audioEffects.eqMid} min="-24" max="24" step="1" onChange={(e) => handleEffectChange('eqMid', e.target.value)} unit=" dB" />
+            <RetroFader label="EQ Low (Bass)" value={audioEffects.eqLow} min="-24" max="24" step="1" onChange={(e) => handleEffectChange('eqLow', e.target.value)} unit=" dB" />
           </div>
 
-          {/* EQ Low */}
+          {/* Right Column */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>EQ Low (Bass)</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{audioEffects.eqLow} dB</span>
+            <RetroFader label="Chorus Intensity" value={(audioEffects.chorus * 100).toFixed(0)} min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('chorus', e.target.value)} unit="%" />
+            <RetroFader label="Phaser Intensity" value={(audioEffects.phaser * 100).toFixed(0)} min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('phaser', e.target.value)} unit="%" />
+            <RetroFader label="Lo-Fi BitCrusher" value={(audioEffects.bitCrusher * 100).toFixed(0)} min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('bitCrusher', e.target.value)} unit="%" />
+            <RetroFader label="Feedback Delay" value={(audioEffects.delay * 100).toFixed(0)} min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('delay', e.target.value)} unit="%" />
+            <RetroFader label="Distortion Crunch" value={(audioEffects.distortion * 100).toFixed(0)} min="0" max="2" step="0.05" onChange={(e) => handleEffectChange('distortion', e.target.value)} unit="%" highlightColor="#e35a5a" />
+            <RetroFader label="Global Sub-Reverb" value={(audioEffects.reverb * 100).toFixed(0)} min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('reverb', e.target.value)} unit="%" />
+            
+            <div style={{ padding: '16px', background: '#111', borderRadius: '6px', border: '1px solid #222', marginTop: '16px' }}>
+              <RetroFader 
+                label="Synthetic Vinyl Crackle" 
+                value={Math.round(audioEffects.vinylCrackle * 100)} 
+                min="0" max="1" step="0.01" 
+                onChange={(e) => handleEffectChange('vinylCrackle', e.target.value)} 
+                unit="%" 
+                highlightColor="#e35a5a" 
+              />
             </div>
-            <input type="range" min="-24" max="24" step="1" value={audioEffects.eqLow} onChange={(e) => handleEffectChange('eqLow', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
           </div>
 
-          {/* EQ Mid */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>EQ Mid</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{audioEffects.eqMid} dB</span>
-            </div>
-            <input type="range" min="-24" max="24" step="1" value={audioEffects.eqMid} onChange={(e) => handleEffectChange('eqMid', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* EQ High */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>EQ High (Treble)</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{audioEffects.eqHigh} dB</span>
-            </div>
-            <input type="range" min="-24" max="24" step="1" value={audioEffects.eqHigh} onChange={(e) => handleEffectChange('eqHigh', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* Chorus */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>Chorus Intensity (Wet)</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{(audioEffects.chorus * 100).toFixed(0)}%</span>
-            </div>
-            <input type="range" min="0" max="1" step="0.05" value={audioEffects.chorus} onChange={(e) => handleEffectChange('chorus', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* Phaser */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>Phaser Intensity (Wet)</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{(audioEffects.phaser * 100).toFixed(0)}%</span>
-            </div>
-            <input type="range" min="0" max="1" step="0.05" value={audioEffects.phaser} onChange={(e) => handleEffectChange('phaser', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* Bit Crusher */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>Lo-Fi BitCrusher</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{(audioEffects.bitCrusher * 100).toFixed(0)}%</span>
-            </div>
-            <input type="range" min="0" max="1" step="0.05" value={audioEffects.bitCrusher} onChange={(e) => handleEffectChange('bitCrusher', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* Delay */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>Feedback Space Delay (Echo)</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{(audioEffects.delay * 100).toFixed(0)}%</span>
-            </div>
-            <input type="range" min="0" max="1" step="0.05" value={audioEffects.delay} onChange={(e) => handleEffectChange('delay', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* Distortion */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>Distortion Crunch</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{(audioEffects.distortion * 100).toFixed(0)}%</span>
-            </div>
-            <input type="range" min="0" max="2" step="0.05" value={audioEffects.distortion} onChange={(e) => handleEffectChange('distortion', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* Reverb */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span>Global Sub-Reverb (Wet/Dry)</span>
-              <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{(audioEffects.reverb * 100).toFixed(0)}%</span>
-            </div>
-            <input type="range" min="0" max="1" step="0.01" value={audioEffects.reverb} onChange={(e) => handleEffectChange('reverb', e.target.value)} style={{ width: '100%', accentColor: '#38bdf8' }} />
-          </div>
-
-          {/* Vinyl Crackle */}
-          <div style={{ padding: '16px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ color: '#e35a5a', fontWeight: 'bold' }}>Synthetic Vinyl Crackle & Dust</span>
-              <span style={{ color: '#e35a5a', fontWeight: 'bold' }}>{Math.round(audioEffects.vinylCrackle * 100)}%</span>
-            </div>
-            <input type="range" min="0" max="1" step="0.01" value={audioEffects.vinylCrackle} onChange={(e) => handleEffectChange('vinylCrackle', e.target.value)} style={{ width: '100%', accentColor: '#e35a5a' }} />
-          </div>
-          
         </div>
       </div>
     </div>

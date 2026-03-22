@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocalPlayer } from '../state/LocalPlayerContext'
 import gsap from 'gsap'
 import vinylImage from '../assets/Vinyl.png'
 import coverOverlay1 from '../assets/1.png'
@@ -18,6 +19,7 @@ function getCookie(name) {
 }
 
 export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
+  const { selectTrack } = useLocalPlayer()
   const [comboMode, setComboMode] = useState('grid')
   const enableTextures = getCookie('enableAlbumTextures') !== 'false'
   const [comboCarouselIndex, setComboCarouselIndex] = useState(0)
@@ -440,7 +442,14 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
                       <li 
                         key={track.id || i} 
                         className="agc-track-item"
-                        onClick={() => onPlayAlbum && onPlayAlbum(album.album)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (track.index !== undefined) {
+                            selectTrack(track.index)
+                          } else if (onPlayAlbum) {
+                            onPlayAlbum(album.album)
+                          }
+                        }}
                       >
                         <span className="agc-track-num">{i + 1}</span>
                         <span className="agc-track-name">{track.title || track.filename || 'Unknown Track'}</span>
