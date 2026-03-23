@@ -18,7 +18,7 @@ function setCookie(name, value, days = 365) {
 // ----------------------------------------------------------------------------
 // Reusable Fader Component for DRY code
 // ----------------------------------------------------------------------------
-const RetroFader = ({ label, value, min, max, step, onChange, unit = "", highlightColor = "#38bdf8", description }) => (
+const RetroFader = ({ label, value, min, max, step, onChange, unit = "", highlightColor = "#38bdf8", description, displayValue }) => (
   <div style={{ marginBottom: '24px' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
       <div>
@@ -26,7 +26,7 @@ const RetroFader = ({ label, value, min, max, step, onChange, unit = "", highlig
         {description && <div style={{ color: '#666', fontSize: '0.75rem', marginTop: '4px' }}>{description}</div>}
       </div>
       <span className="lcd-readout" style={{ color: highlightColor, fontWeight: 'bold', fontSize: '0.9rem' }}>
-        {value}{unit}
+        {displayValue !== undefined ? displayValue : value}{unit}
       </span>
     </div>
     <input 
@@ -163,12 +163,54 @@ export default function SettingsPage() {
 
           {/* Right Column */}
           <div>
-            <RetroFader label="Chorus Intensity" value={(audioEffects.chorus * 100).toFixed(0)} min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('chorus', e.target.value)} unit="%" />
-            <RetroFader label="Phaser Intensity" value={(audioEffects.phaser * 100).toFixed(0)} min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('phaser', e.target.value)} unit="%" />
-            <RetroFader label="Lo-Fi BitCrusher" value={(audioEffects.bitCrusher * 100).toFixed(0)} min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('bitCrusher', e.target.value)} unit="%" />
-            <RetroFader label="Feedback Delay" value={(audioEffects.delay * 100).toFixed(0)} min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('delay', e.target.value)} unit="%" />
-            <RetroFader label="Distortion Crunch" value={(audioEffects.distortion * 100).toFixed(0)} min="0" max="2" step="0.05" onChange={(e) => handleEffectChange('distortion', e.target.value)} unit="%" highlightColor="#e35a5a" />
-            <RetroFader label="Global Sub-Reverb" value={(audioEffects.reverb * 100).toFixed(0)} min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('reverb', e.target.value)} unit="%" />
+            <RetroFader 
+              label="Chorus Intensity" 
+              value={audioEffects.chorus || 0} 
+              displayValue={Math.round((audioEffects.chorus || 0) * 100)} 
+              min="0" max="1" step="0.01" 
+              onChange={(e) => handleEffectChange('chorus', e.target.value)} 
+              unit="%" 
+            />
+            <RetroFader 
+              label="Phaser Intensity" 
+              value={audioEffects.phaser || 0} 
+              displayValue={Math.round((audioEffects.phaser || 0) * 100)} 
+              min="0" max="1" step="0.01" 
+              onChange={(e) => handleEffectChange('phaser', e.target.value)} 
+              unit="%" 
+            />
+            <RetroFader 
+              label="Lo-Fi BitCrusher" 
+              value={audioEffects.bitCrusher || 0} 
+              displayValue={Math.round((audioEffects.bitCrusher || 0) * 100)} 
+              min="0" max="1" step="0.01" 
+              onChange={(e) => handleEffectChange('bitCrusher', e.target.value)} unit="%" 
+            />
+            <RetroFader 
+              label="Feedback Delay" 
+              value={audioEffects.delay || 0} 
+              displayValue={Math.round((audioEffects.delay || 0) * 100)} 
+              min="0" max="1" step="0.01" 
+              onChange={(e) => handleEffectChange('delay', e.target.value)} 
+              unit="%" 
+            />
+            <RetroFader 
+              label="Distortion Crunch" 
+              value={audioEffects.distortion || 0} 
+              displayValue={Math.round((audioEffects.distortion || 0) * 100)} 
+              min="0" max="2" step="0.01" 
+              onChange={(e) => handleEffectChange('distortion', e.target.value)} 
+              unit="%" 
+              highlightColor="#e35a5a" 
+            />
+            <RetroFader 
+              label="Global Sub-Reverb" 
+              value={audioEffects.reverb || 0} 
+              displayValue={Math.round((audioEffects.reverb || 0) * 100)} 
+              min="0" max="1" step="0.01" 
+              onChange={(e) => handleEffectChange('reverb', e.target.value)} 
+              unit="%" 
+            />
             
             <div style={{ padding: '16px', background: '#111', borderRadius: '6px', border: '1px solid #222', marginTop: '16px' }}>
               <RetroFader 

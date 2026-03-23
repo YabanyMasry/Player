@@ -61,20 +61,26 @@ export function LocalPlayerProvider({ children }) {
   }, [tracks.length])
 
   // --------------------------------------------------------
-  // 2. Consolidated Playback & Source Logic
+  // 2. Track Source Management (Decoupled from Play/Pause)
   // --------------------------------------------------------
   useEffect(() => {
     const audio = audioRef.current
     if (!audio || currentIndex === null) return
 
     const currentUrl = tracks[currentIndex]?.url
-    
-    // Only update src and reset time if the track actually changed
-    if (currentUrl && audio.src !== currentUrl) {
+    if (currentUrl && audio.src !== new URL(currentUrl, window.location.origin).toString()) {
       audio.src = currentUrl
       setCurrentTime(0)
       setDuration(0)
     }
+  }, [currentIndex, tracks])
+
+  // --------------------------------------------------------
+  // 3. Playback Control
+  // --------------------------------------------------------
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || currentIndex === null) return
 
     if (isPlaying) {
       audio.play().catch((err) => {
@@ -84,7 +90,7 @@ export function LocalPlayerProvider({ children }) {
     } else {
       audio.pause()
     }
-  }, [currentIndex, isPlaying, tracks])
+  }, [isPlaying, currentIndex])
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume
@@ -107,33 +113,33 @@ export function LocalPlayerProvider({ children }) {
 
       const rawCtx = new (window.AudioContext || window.webkitAudioContext)()
       audio._audioContext = rawCtx
-      
+
       Tone.setContext(new Tone.Context(rawCtx))
-      
+
       const rawSource = rawCtx.createMediaElementSource(audio)
       audio._waveformSource = rawSource
 
       const eq = new Tone.EQ3(0, 0, 0)
       const dist = new Tone.Distortion(0)
       const pitch = new Tone.PitchShift(0)
-      pitch.wet.value = 0 
-      
+      pitch.wet.value = 0
+
       const chorus = new Tone.Chorus(4, 2.5, 0)
       chorus.wet.value = 0
       chorus.start()
-      
+
       const phaser = new Tone.Phaser({ frequency: 15, octaves: 5, baseFrequency: 1000 })
       phaser.wet.value = 0
-      
+
       const bitCrusher = new Tone.BitCrusher(4)
       bitCrusher.wet.value = 0
-      
+
       const delay = new Tone.FeedbackDelay("8n", 0.5)
       delay.wet.value = 0
-      
+
       const limiter = new Tone.Limiter(-1)
       const rev = new Tone.Reverb({ decay: 2.5, wet: 0 })
-      rev.generate().catch(() => {})
+      rev.generate().catch(() => { })
 
       Tone.connect(rawSource, eq)
       eq.chain(pitch, chorus, phaser, bitCrusher, dist, delay, rev, limiter)
@@ -149,7 +155,7 @@ export function LocalPlayerProvider({ children }) {
       eq.high.value = audioEffects.eqHigh
       eq.mid.value = audioEffects.eqMid
       eq.low.value = audioEffects.eqLow
-      
+
       pitch.pitch = audioEffects.pitchShift
       pitch.wet.value = audioEffects.pitchShift !== 0 ? 1 : 0
       chorus.wet.value = audioEffects.chorus
@@ -158,7 +164,7 @@ export function LocalPlayerProvider({ children }) {
       bitCrusher.bits.value = Math.max(1, 8 - Math.round(audioEffects.bitCrusher * 7))
       bitCrusher.wet.value = audioEffects.bitCrusher > 0 ? 1 : 0
       delay.wet.value = audioEffects.delay
-      
+
       dist.distortion = audioEffects.distortion
       rev.wet.value = audioEffects.reverb
     }
@@ -198,7 +204,7 @@ export function LocalPlayerProvider({ children }) {
     try {
       const endpoint = isRefresh ? '/api/library/refresh' : '/api/library'
       const options = isRefresh ? { method: 'POST' } : undefined
-      
+
       const response = await fetch(endpoint, options)
       if (!response.ok) {
         const text = await response.text()
@@ -371,7 +377,7 @@ export function LocalPlayerProvider({ children }) {
     audioEffects,
     setAudioEffects,
   }), [
-    tracks, albums, currentIndex, isPlaying, currentTime, duration, 
+    tracks, albums, currentIndex, isPlaying, currentTime, duration,
     volume, playbackRate, libraryPath, isLoadingLibrary, libraryError, audioEffects,
     loadLibrary, refreshLibrary, selectTrack, playAlbum, togglePlay, prevTrack, nextTrack, seek
   ])

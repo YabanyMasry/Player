@@ -42,8 +42,15 @@ function useAnimation(frames, { fps, autoplay, loop, onFrame }) {
 
     const animate = (t) => {
       if (lastTimeRef.current === 0) lastTimeRef.current = t
-      const dt = t - lastTimeRef.current
+      let dt = t - lastTimeRef.current
       lastTimeRef.current = t
+
+      // Fix: If the tab was backgrounded, dt will be very large.
+      // Clamp it to the interval to prevent "catching up" (speeding up).
+      if (dt > 250) {
+        dt = interval
+      }
+
       accRef.current += dt
       if (accRef.current >= interval) {
         accRef.current -= interval

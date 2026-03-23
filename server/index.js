@@ -189,14 +189,14 @@ async function scanLibrary() {
           const m3uText = await fs.readFile(file.fullPath, 'utf8')
           const parsed = parseM3uOrder(m3uText)
           if (parsed.size > 0) playlistOrderMap = parsed
-        } catch {}
+        } catch { }
         continue
       }
       if (LRC_EXT_RE.test(lower)) {
         try {
           const lrcText = await fs.readFile(file.fullPath, 'utf8')
           lyricsByBase.set(stripExtension(file.name).toLowerCase(), parseLrcText(lrcText))
-        } catch {}
+        } catch { }
       }
     }
 
