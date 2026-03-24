@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocalPlayer } from '../state/LocalPlayerContext';
-import './SettingsPage.css'; // Don't forget to import the CSS!
+import './SettingsPage.css';
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -16,7 +16,7 @@ function setCookie(name, value, days = 365) {
 }
 
 // ----------------------------------------------------------------------------
-// Reusable Fader Component for DRY code
+// Reusable Fader Component
 // ----------------------------------------------------------------------------
 const RetroFader = ({ label, value, min, max, step, onChange, unit = "", highlightColor = "#38bdf8", description, displayValue }) => (
   <div style={{ marginBottom: '24px' }}>
@@ -70,8 +70,25 @@ export default function SettingsPage() {
       eqHigh: 0, eqMid: 0, eqLow: 0, 
       distortion: 0, reverb: 0, vinylCrackle: 0, 
       pitchShift: 0, chorus: 0, phaser: 0, 
-      bitCrusher: 0, delay: 0
+      bitCrusher: 0, delay: 0,
+      djFilter: 0, autoWah: 0, stereoWidth: 0.5, 
+      autoPan: 0, wowFlutter: 0, tapeSaturation: 0, sidechainPump: 0
     });
+  };
+
+  // Helper for Stereo Width Display
+  const getStereoLabel = (val) => {
+    if (val === 0) return "TRUE MONO";
+    if (val === 0.5) return "NORM";
+    if (val > 0.95) return "ULTRA WIDE";
+    return `${Math.round(val * 200)}%`;
+  };
+
+  // Helper for DJ Filter Display
+  const getFilterLabel = (val) => {
+    if (val === 0) return "BYPASS";
+    if (val < 0) return `LO-PASS ${Math.round(Math.abs(val) * 100)}%`;
+    return `HI-PASS ${Math.round(val * 100)}%`;
   };
 
   return (
@@ -103,7 +120,7 @@ export default function SettingsPage() {
         </button>
       </div>
       
-      {/* Visual Settings Rack */}
+      {/* 1. Visual Settings Rack */}
       <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
         <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Visual Outputs
@@ -123,109 +140,143 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Audio Engine Rack */}
-      <div className="settings-rack-panel" style={{ padding: '30px' }}>
+      {/* 2. DJ & Dynamics Rack */}
+      <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
         <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          DSP Master Bus
+          DJ Performance & Dynamics
         </h2>
-        <p style={{ marginTop: '0', marginBottom: '32px', color: '#666', fontSize: '0.85rem', lineHeight: '1.5', fontStyle: 'italic' }}>
-          Audio routed through multi-node Tone.js limiter block. Adjustments apply globally to the playback engine.
-        </p>
-
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 40px' }}>
-          
-          {/* Left Column */}
           <div>
             <RetroFader 
-              label="Tape Speed (Rate)" 
-              value={playbackRate.toFixed(2)} 
-              min="0.25" max="2" step="0.05" 
-              onChange={(e) => setPlaybackRate(parseFloat(e.target.value))} 
-              unit="x"
-              description="Physically slows the read speed, dropping pitch and tempo."
+              label="Tape Speed (Rate)" value={playbackRate.toFixed(2)} 
+              min="0.25" max="2" step="0.05" onChange={(e) => setPlaybackRate(parseFloat(e.target.value))} 
+              unit="x" description="Physically slows the read speed, dropping pitch and tempo."
             />
-            
             <RetroFader 
-              label="Digital Pitch Shift" 
-              value={audioEffects.pitchShift} 
-              min="-12" max="12" step="1" 
-              onChange={(e) => handleEffectChange('pitchShift', e.target.value)} 
-              unit=" st"
-              description="Phase vocoder shifting independent of playback time."
+              label="Digital Pitch Shift" value={audioEffects.pitchShift} 
+              min="-12" max="12" step="1" onChange={(e) => handleEffectChange('pitchShift', e.target.value)} 
+              unit=" st" description="Phase vocoder shifting independent of playback time."
             />
+            <RetroFader 
+              label="1-Knob DJ Isolator Filter" value={audioEffects.djFilter || 0} 
+              displayValue={getFilterLabel(audioEffects.djFilter || 0)}
+              min="-1" max="1" step="0.01" onChange={(e) => handleEffectChange('djFilter', e.target.value)} 
+              description="Sweep left to muffle (Low-pass), right to thin out (High-pass)."
+              highlightColor={audioEffects.djFilter === 0 ? "#888" : "#38bdf8"}
+            />
+          </div>
+          <div>
+            <RetroFader 
+              label="AutoWah Envelope" value={audioEffects.autoWah || 0} 
+              displayValue={Math.round((audioEffects.autoWah || 0) * 100)} 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('autoWah', e.target.value)} 
+              unit="%" description="Dynamic funky filtering based on track volume."
+            />
+            <RetroFader 
+              label="Sidechain Pump" value={audioEffects.sidechainPump || 0} 
+              displayValue={Math.round((audioEffects.sidechainPump || 0) * 100)} 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('sidechainPump', e.target.value)} 
+              unit="%" description="EDM-style rhythmic volume ducking on the quarter note."
+            />
+          </div>
+        </div>
+      </div>
 
-            <div style={{ height: '1px', background: '#222', margin: '24px 0' }} /> {/* Divider */}
+      {/* 3. Analog Emulation Rack */}
+      <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
+        <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Vintage Analog Textures
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 40px' }}>
+          <div>
+            <RetroFader 
+              label="Wow & Flutter" value={audioEffects.wowFlutter || 0} 
+              displayValue={Math.round((audioEffects.wowFlutter || 0) * 100)} 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('wowFlutter', e.target.value)} 
+              unit="%" description="Simulates warped records and imperfect motor belts."
+            />
+            <RetroFader 
+              label="Harmonic Tape Saturation" value={audioEffects.tapeSaturation || 0} 
+              displayValue={Math.round((audioEffects.tapeSaturation || 0) * 100)} 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('tapeSaturation', e.target.value)} 
+              unit="%" description="Non-linear, warm, thick magnetic distortion."
+              highlightColor="#facc15"
+            />
+          </div>
+          <div>
+            <RetroFader 
+              label="Lo-Fi BitCrusher" value={audioEffects.bitCrusher || 0} 
+              displayValue={Math.round((audioEffects.bitCrusher || 0) * 100)} 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('bitCrusher', e.target.value)} unit="%" 
+            />
+            <RetroFader 
+              label="Distortion Crunch" value={audioEffects.distortion || 0} 
+              displayValue={Math.round((audioEffects.distortion || 0) * 100)} 
+              min="0" max="2" step="0.01" onChange={(e) => handleEffectChange('distortion', e.target.value)} 
+              unit="%" highlightColor="#e35a5a" 
+            />
+            <div style={{ padding: '16px', background: '#111', borderRadius: '6px', border: '1px solid #222', marginTop: '16px' }}>
+              <RetroFader 
+                label="Synthetic Vinyl Crackle" value={audioEffects.vinylCrackle || 0}
+                displayValue={Math.round((audioEffects.vinylCrackle || 0) * 100)} 
+                min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('vinylCrackle', e.target.value)} 
+                unit="%" highlightColor="#e35a5a" 
+                description="Injects filtered pink noise directly into the master bus."
+              />
+            </div>
+          </div>
+        </div>
+      </div>
 
+      {/* 4. Mastering & Spatial Rack */}
+      <div className="settings-rack-panel" style={{ padding: '30px' }}>
+        <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Spatial Imaging & Mastering
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 40px' }}>
+          <div>
+            <RetroFader 
+              label="Stereo Widener" value={audioEffects.stereoWidth ?? 0.5} 
+              displayValue={getStereoLabel(audioEffects.stereoWidth ?? 0.5)}
+              min="0" max="1" step="0.05" onChange={(e) => handleEffectChange('stereoWidth', e.target.value)} 
+              description="Pull left to collapse to Mono. Push right to expand past the headphones."
+              highlightColor={audioEffects.stereoWidth === 0 ? "#888" : "#38bdf8"}
+            />
+            <RetroFader 
+              label="LFO Auto-Panner" value={audioEffects.autoPan || 0} 
+              displayValue={Math.round((audioEffects.autoPan || 0) * 100)} 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('autoPan', e.target.value)} unit="%" 
+            />
+            <div style={{ height: '1px', background: '#222', margin: '24px 0' }} />
             <RetroFader label="EQ High (Treble)" value={audioEffects.eqHigh} min="-24" max="24" step="1" onChange={(e) => handleEffectChange('eqHigh', e.target.value)} unit=" dB" />
             <RetroFader label="EQ Mid" value={audioEffects.eqMid} min="-24" max="24" step="1" onChange={(e) => handleEffectChange('eqMid', e.target.value)} unit=" dB" />
             <RetroFader label="EQ Low (Bass)" value={audioEffects.eqLow} min="-24" max="24" step="1" onChange={(e) => handleEffectChange('eqLow', e.target.value)} unit=" dB" />
           </div>
-
-          {/* Right Column */}
           <div>
             <RetroFader 
-              label="Chorus Intensity" 
-              value={audioEffects.chorus || 0} 
+              label="Chorus Intensity" value={audioEffects.chorus || 0} 
               displayValue={Math.round((audioEffects.chorus || 0) * 100)} 
-              min="0" max="1" step="0.01" 
-              onChange={(e) => handleEffectChange('chorus', e.target.value)} 
-              unit="%" 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('chorus', e.target.value)} unit="%" 
             />
             <RetroFader 
-              label="Phaser Intensity" 
-              value={audioEffects.phaser || 0} 
+              label="Phaser Intensity" value={audioEffects.phaser || 0} 
               displayValue={Math.round((audioEffects.phaser || 0) * 100)} 
-              min="0" max="1" step="0.01" 
-              onChange={(e) => handleEffectChange('phaser', e.target.value)} 
-              unit="%" 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('phaser', e.target.value)} unit="%" 
             />
             <RetroFader 
-              label="Lo-Fi BitCrusher" 
-              value={audioEffects.bitCrusher || 0} 
-              displayValue={Math.round((audioEffects.bitCrusher || 0) * 100)} 
-              min="0" max="1" step="0.01" 
-              onChange={(e) => handleEffectChange('bitCrusher', e.target.value)} unit="%" 
-            />
-            <RetroFader 
-              label="Feedback Delay" 
-              value={audioEffects.delay || 0} 
+              label="Feedback Delay" value={audioEffects.delay || 0} 
               displayValue={Math.round((audioEffects.delay || 0) * 100)} 
-              min="0" max="1" step="0.01" 
-              onChange={(e) => handleEffectChange('delay', e.target.value)} 
-              unit="%" 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('delay', e.target.value)} unit="%" 
             />
             <RetroFader 
-              label="Distortion Crunch" 
-              value={audioEffects.distortion || 0} 
-              displayValue={Math.round((audioEffects.distortion || 0) * 100)} 
-              min="0" max="2" step="0.01" 
-              onChange={(e) => handleEffectChange('distortion', e.target.value)} 
-              unit="%" 
-              highlightColor="#e35a5a" 
-            />
-            <RetroFader 
-              label="Global Sub-Reverb" 
-              value={audioEffects.reverb || 0} 
+              label="Global Sub-Reverb" value={audioEffects.reverb || 0} 
               displayValue={Math.round((audioEffects.reverb || 0) * 100)} 
-              min="0" max="1" step="0.01" 
-              onChange={(e) => handleEffectChange('reverb', e.target.value)} 
-              unit="%" 
+              min="0" max="1" step="0.01" onChange={(e) => handleEffectChange('reverb', e.target.value)} unit="%" 
             />
-            
-            <div style={{ padding: '16px', background: '#111', borderRadius: '6px', border: '1px solid #222', marginTop: '16px' }}>
-              <RetroFader 
-                label="Synthetic Vinyl Crackle" 
-                value={Math.round(audioEffects.vinylCrackle * 100)} 
-                min="0" max="1" step="0.01" 
-                onChange={(e) => handleEffectChange('vinylCrackle', e.target.value)} 
-                unit="%" 
-                highlightColor="#e35a5a" 
-              />
-            </div>
           </div>
-
         </div>
       </div>
+
     </div>
   );
 }

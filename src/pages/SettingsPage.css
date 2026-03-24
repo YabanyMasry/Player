@@ -108,3 +108,16 @@
   transform: translateX(20px);
   background: linear-gradient(145deg, #38bdf8, #0284c7); /* LED blue when on */
 }
+/* Hardware-style Action Buttons (Tape Stop, Stutter) */
+.retro-action-btn {
+  font-family: "Courier New", Courier, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.85rem;
+  transition: all 0.05s ease !important;
+  user-select: none;
+}
+
+.retro-action-btn:active {
+  transform: translateY(3px) !important;
+}

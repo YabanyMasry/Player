@@ -344,12 +344,39 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
         </div>
 
         <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', marginTop: '12px', height: '450px' }}>
+
           {/* Left Column: Permanent Cover Monitor */}
-          <div className="vp-digital-panel" style={{ flexDirection: 'column', gap: '4px', padding: '14px', height: '108px', width: '108px', boxSizing: 'border-box', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="vp-digital-panel" style={{ flexDirection: 'column', gap: '16px', padding: '14px', height: 'auto', width: '108px', boxSizing: 'border-box', alignItems: 'center', justifyContent: 'center' }}>
+
             <div style={{ width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {MemoizedCoverMatrix}
             </div>
+
+            {/* The new rectangular album navigation buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '085px', marginTop: '2px' }}>
+              <button
+                className='vp-retro-btn-rect'
+                onClick={(e) => { e.stopPropagation(); onPrevAlbum?.(); }}
+                title="Previous Album"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+
+              <button
+                className='vp-retro-btn-rect'
+                onClick={(e) => { e.stopPropagation(); onNextAlbum?.(); }}
+                title="Next Album"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+
           </div>
+
 
           {/* Right Column: Switching Control/Display Area */}
           <div style={{ width: '260px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -404,28 +431,28 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
                     </div>
                   </div>
                   <div className="vp-slider-group">
-                    <span className="vp-slider-label">PTC</span>
-                    <div className="vp-slider-wrapper">
-                      <div className="vp-slider-ticks" />
-                      <input type="range" className="vp-slider" min="50" max="150" step="10"
-                        value={Math.round(playbackRate * 100)} onChange={e => onPlaybackRateChange?.(Number(e.target.value) / 100)}
-                      />
-                    </div>
-                  </div>
-                  <div className="vp-slider-group">
                     <span className="vp-slider-label">BASS</span>
                     <div className="vp-slider-wrapper">
                       <div className="vp-slider-ticks" />
-                      <input type="range" className="vp-slider" min="-12" max="12" step="2.4"
+                      <input type="range" className="vp-slider" min="-12" max="12" step="1"
                         value={audioEffects.eqLow ?? 0} onChange={e => onEffectChange?.('eqLow', Number(e.target.value))}
                       />
                     </div>
                   </div>
                   <div className="vp-slider-group">
-                    <span className="vp-slider-label">TRB</span>
+                    <span className="vp-slider-label">MID</span>
                     <div className="vp-slider-wrapper">
                       <div className="vp-slider-ticks" />
-                      <input type="range" className="vp-slider" min="-12" max="12" step="2.4"
+                      <input type="range" className="vp-slider" min="-12" max="12" step="1"
+                        value={audioEffects.eqMid ?? 0} onChange={e => onEffectChange?.('eqMid', Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  <div className="vp-slider-group">
+                    <span className="vp-slider-label">TRE</span>
+                    <div className="vp-slider-wrapper">
+                      <div className="vp-slider-ticks" />
+                      <input type="range" className="vp-slider" min="-12" max="12" step="1"
                         value={audioEffects.eqHigh ?? 0} onChange={e => onEffectChange?.('eqHigh', Number(e.target.value))}
                       />
                     </div>

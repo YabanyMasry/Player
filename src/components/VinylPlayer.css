@@ -215,19 +215,19 @@
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  
+
   /* Deep matte plastic/metal gradient */
   background: linear-gradient(135deg, #1c1c1c 0%, #0d0d0d 100%);
   border: 1px solid #050505;
   transform: translate(-50%, -50%);
   z-index: 10;
   pointer-events: none;
-  
+
   /* Subtle top edge highlight, deep shadow on the console */
-  box-shadow: 
-    inset 1px 1px 2px rgba(255, 255, 255, 0.04), 
-    0 4px 12px rgba(0, 0, 0, 0.8), 
-    0 0 2px rgba(0, 0, 0, 1); 
+  box-shadow:
+    inset 1px 1px 2px rgba(255, 255, 255, 0.04),
+    0 4px 12px rgba(0, 0, 0, 0.8),
+    0 0 2px rgba(0, 0, 0, 1);
 }
 
 .vp-tonearm {
@@ -248,11 +248,11 @@
   left: 1px;
   width: 10px;
   height: 268px;
-  
+
   /* Cylindrical gradient to give it physical volume */
   background: linear-gradient(90deg, #a3a3a3 0%, #ffffff 30%, #ffffff 70%, #8a8a8a 100%);
   border-radius: 5px;
-  
+
   /* Casts a shadow down onto the record */
   box-shadow: 3px 5px 10px rgba(0, 0, 0, 0.6), 1px 1px 2px rgba(0, 0, 0, 0.4);
 }
@@ -264,13 +264,13 @@
   left: 3px;
   width: 10px;
   height: 88px;
-  
+
   /* Matches the cylindrical gradient of the main wand */
   background: linear-gradient(90deg, #a3a3a3 0%, #ffffff 30%, #ffffff 70%, #8a8a8a 100%);
   border-radius: 5px;
   transform-origin: top center;
   transform: rotate(40deg);
-  
+
   box-shadow: 3px 5px 10px rgba(0, 0, 0, 0.6), 1px 1px 2px rgba(0, 0, 0, 0.4);
 }
 
@@ -282,15 +282,18 @@
   transform: translate(-50%, 0);
   width: 30px;
   height: 60px;
-  
+
   /* Matches the pivot ring material */
   background: linear-gradient(145deg, #1a1a1a, #0d0d0d);
   border: 1px solid #000;
-  border-radius: 6px 6px 4px 4px; /* Slightly tapered look at the bottom */
-  
-  box-shadow: 
-    inset 1px 1px 1px rgba(255, 255, 255, 0.05), /* Edge catchlight */
-    4px 6px 12px rgba(0, 0, 0, 0.7); /* Deep shadow hovering over the vinyl */
+  border-radius: 6px 6px 4px 4px;
+  /* Slightly tapered look at the bottom */
+
+  box-shadow:
+    inset 1px 1px 1px rgba(255, 255, 255, 0.05),
+    /* Edge catchlight */
+    4px 6px 12px rgba(0, 0, 0, 0.7);
+  /* Deep shadow hovering over the vinyl */
 }
 
 /* A tiny physical detail: The Stylus Cartridge */
@@ -305,7 +308,7 @@
   background: #2a2a2a;
   border-radius: 2px;
   border: 1px solid #111;
-  box-shadow: inset 0 1px 2px rgba(255,255,255,0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
 
@@ -356,6 +359,7 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
+
 .vp-lyrics-container::-webkit-scrollbar {
   display: none;
 }
@@ -385,23 +389,25 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  
+
   /* A subtle gradient makes the top of the button catch light 
      and the bottom fade into shadow, giving it a 3D dome effect */
   background: linear-gradient(145deg, #222222, #0d0d0d);
-  border: 1px solid #050505; /* Dark base ring */
-  
+  border: 1px solid #050505;
+  /* Dark base ring */
+
   /* The Magic:
     1. Outer dark shadow (bottom right) for physical elevation
     2. Outer light highlight (top left) to catch ambient light
     3. Faint inner rim highlight so the edge looks sharp
   */
-  box-shadow: 
+  box-shadow:
     3px 3px 5px rgba(0, 0, 0, 0.8),
     -1px -1px 2px rgba(255, 255, 255, 0.06),
     inset 1px 1px 1px rgba(255, 255, 255, 0.08);
-    
-  color: #777777; /* Slightly brighter resting state */
+
+  color: #777777;
+  /* Slightly brighter resting state */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -412,12 +418,12 @@
 
 /* Make the SVG look painted on the raised surface */
 .vp-retro-btn svg {
-  filter: drop-shadow(0 -1px 1px rgba(0,0,0,0.8));
+  filter: drop-shadow(0 -1px 1px rgba(0, 0, 0, 0.8));
 }
 
 /* Hover state: Icon lights up */
 .vp-retro-btn:hover {
-  color: #bbbbbb; 
+  color: #bbbbbb;
 }
 
 /* Active state: Physically clicking the button down */
@@ -425,12 +431,61 @@
   /* Flatten the gradient */
   background: #111111;
   /* Remove the drop shadow and add a harsh inset shadow to sink it */
-  box-shadow: 
+  box-shadow:
     0px 0px 0px rgba(0, 0, 0, 0),
     0px 0px 0px rgba(255, 255, 255, 0),
     inset 2px 2px 5px rgba(0, 0, 0, 0.9);
   color: #444444;
-  transform: translateY(1px); /* Physically move it down */
+  transform: translateY(1px);
+  /* Physically move it down */
+}
+
+/* Retro Hardware Button - Rectangular / Convex */
+.vp-retro-btn-rect {
+  width: 38px;
+  /* Wide enough to look like a hardware switch */
+  height: 20px;
+  /* Slim height to fit under the album art */
+  border-radius: 3px;
+  /* Just a tiny rounding on the corners */
+
+  /* Same 3D dome gradient as the round buttons */
+  background: linear-gradient(145deg, #222222, #0d0d0d);
+  border: 1px solid #050505;
+
+  /* Physical elevation shadows */
+  box-shadow:
+    3px 3px 5px rgba(0, 0, 0, 0.8),
+    -1px -1px 2px rgba(255, 255, 255, 0.06),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.08);
+
+  color: #777777;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.1s ease;
+}
+
+/* Paint the SVG on the surface */
+.vp-retro-btn-rect svg {
+  filter: drop-shadow(0 -1px 1px rgba(0, 0, 0, 0.8));
+}
+
+.vp-retro-btn-rect:hover {
+  color: #bbbbbb;
+}
+
+/* Clicking physically sinks the rectangle into the panel */
+.vp-retro-btn-rect:active {
+  background: #111111;
+  box-shadow:
+    0px 0px 0px rgba(0, 0, 0, 0),
+    0px 0px 0px rgba(255, 255, 255, 0),
+    inset 2px 2px 5px rgba(0, 0, 0, 0.9);
+  color: #444444;
+  transform: translateY(1px);
 }
 
 /* ── sliders ──────────────────────────────────── */

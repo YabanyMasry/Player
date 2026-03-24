@@ -27,6 +27,13 @@ export function LocalPlayerProvider({ children }) {
     phaser: 0,
     bitCrusher: 0,
     delay: 0,
+    djFilter: 0,
+    autoWah: 0,
+    stereoWidth: 0.5,
+    autoPan: 0,
+    wowFlutter: 0,
+    tapeSaturation: 0,
+    sidechainPump: 0,
   })
 
   const audioRef = useRef(null)
@@ -61,7 +68,7 @@ export function LocalPlayerProvider({ children }) {
   }, [tracks.length])
 
   // --------------------------------------------------------
-  // 2. Track Source Management (Decoupled from Play/Pause)
+  // 2. Track Source Management
   // --------------------------------------------------------
   useEffect(() => {
     const audio = audioRef.current
@@ -101,7 +108,7 @@ export function LocalPlayerProvider({ children }) {
   }, [playbackRate])
 
   // --------------------------------------------------------
-  // 3. Tone.js Initialization & Cleanup (Memory Leak Fix)
+  // 4. Tone.js Initialization & Master Chain (TRUE BYPASS FIX)
   // --------------------------------------------------------
   useEffect(() => {
     const audio = audioRef.current
@@ -119,14 +126,18 @@ export function LocalPlayerProvider({ children }) {
       const rawSource = rawCtx.createMediaElementSource(audio)
       audio._waveformSource = rawSource
 
+      // EVERY effect is strictly initialized with wet.value = 0 (True Bypass)
+      // so it physically does not process the audio unless activated.
       const eq = new Tone.EQ3(0, 0, 0)
+
       const dist = new Tone.Distortion(0)
+      dist.wet.value = 0
+
       const pitch = new Tone.PitchShift(0)
       pitch.wet.value = 0
 
-      const chorus = new Tone.Chorus(4, 2.5, 0)
+      const chorus = new Tone.Chorus(4, 2.5, 0).start()
       chorus.wet.value = 0
-      chorus.start()
 
       const phaser = new Tone.Phaser({ frequency: 15, octaves: 5, baseFrequency: 1000 })
       phaser.wet.value = 0
@@ -137,48 +148,162 @@ export function LocalPlayerProvider({ children }) {
       const delay = new Tone.FeedbackDelay("8n", 0.5)
       delay.wet.value = 0
 
-      const limiter = new Tone.Limiter(-1)
+      const widener = new Tone.StereoWidener(1)
+      widener.wet.value = 0 // Bypassed by default
+
+      const autoPanner = new Tone.AutoPanner("4n").start()
+      autoPanner.wet.value = 0
+
+      const sidechain = new Tone.Tremolo("4n", 1).start()
+      sidechain.type = "sine"
+      sidechain.wet.value = 0
+
+      const autoWah = new Tone.AutoWah(50, 6, -30)
+      autoWah.Q.value = 6
+      autoWah.wet.value = 0
+
+      // A 20kHz filter still causes phase shift. We set Q to 0 and push it to 22kHz to make it invisible.
+      const djFilter = new Tone.Filter(22000, "lowpass", -12)
+      djFilter.Q.value = 0
+
+      const vibrato = new Tone.Vibrato(1.5, 0)
+      vibrato.wet.value = 0
+
+      const saturation = new Tone.Chebyshev(50)
+      saturation.wet.value = 0
+
+      // FIXED: Limiter was set to -1dB, squashing the raw audio. Now set to 0dB.
+      const limiter = new Tone.Limiter(0)
+
+      // Independent Noise Engine
+      const vinylHiss = new Tone.Noise("pink").start()
+      const hissFilter = new Tone.Filter(3500, "lowpass")
+      const crackleGain = new Tone.Gain(0)
+      vinylHiss.chain(hissFilter, crackleGain, limiter)
+
       const rev = new Tone.Reverb({ decay: 2.5, wet: 0 })
       rev.generate().catch(() => { })
 
-      Tone.connect(rawSource, eq)
-      eq.chain(pitch, chorus, phaser, bitCrusher, dist, delay, rev, limiter)
+      // Build Graph
+      Tone.connect(rawSource, widener)
+      widener.chain(
+        autoPanner, sidechain, autoWah, djFilter, vibrato,
+        eq, saturation, pitch, chorus, phaser, bitCrusher, dist,
+        delay, rev, limiter
+      )
+
       limiter.toDestination()
-
       audio._tapNode = limiter
-      toneNodesRef.current = { eq, pitch, chorus, phaser, bitCrusher, dist, delay, rev, limiter }
+
+      toneNodesRef.current = {
+        eq, pitch, chorus, phaser, bitCrusher, dist, delay, rev, limiter, crackleGain,
+        widener, autoPanner, sidechain, autoWah, djFilter, vibrato, saturation
+      }
     }
 
-    // Effect Routing
+    // --- REAL-TIME EFFECT ROUTING ---
     if (toneNodesRef.current) {
-      const { eq, pitch, chorus, phaser, bitCrusher, dist, delay, rev } = toneNodesRef.current
-      eq.high.value = audioEffects.eqHigh
-      eq.mid.value = audioEffects.eqMid
-      eq.low.value = audioEffects.eqLow
+      const nodes = toneNodesRef.current
 
-      pitch.pitch = audioEffects.pitchShift
-      pitch.wet.value = audioEffects.pitchShift !== 0 ? 1 : 0
-      chorus.wet.value = audioEffects.chorus
-      if (audioEffects.chorus > 0) chorus.depth = 0.5
-      phaser.wet.value = audioEffects.phaser
-      bitCrusher.bits.value = Math.max(1, 8 - Math.round(audioEffects.bitCrusher * 7))
-      bitCrusher.wet.value = audioEffects.bitCrusher > 0 ? 1 : 0
-      delay.wet.value = audioEffects.delay
+      // EQ (Since EQ3 has no wet property, it runs purely on the value)
+      nodes.eq.high.value = audioEffects.eqHigh
+      nodes.eq.mid.value = audioEffects.eqMid
+      nodes.eq.low.value = audioEffects.eqLow
 
-      dist.distortion = audioEffects.distortion
-      rev.wet.value = audioEffects.reverb
-    }
+      // Distortion
+      nodes.dist.distortion = audioEffects.distortion
+      nodes.dist.wet.value = audioEffects.distortion > 0 ? 1 : 0 // True Bypass if 0
 
-    // Cleanup function to prevent memory leaks on unmount
-    return () => {
-      // We only dispose nodes if the component actually unmounts completely.
-      // For a persistent global player, you might omit this or handle it carefully,
-      // but it's best practice to clean up AudioNodes.
+      // Reverb & Crackle
+      nodes.rev.wet.value = audioEffects.reverb
+      nodes.crackleGain.gain.value = audioEffects.vinylCrackle * 0.05
+
+      // Pitch
+      nodes.pitch.pitch = audioEffects.pitchShift
+      nodes.pitch.wet.value = audioEffects.pitchShift !== 0 ? 1 : 0 // True Bypass if 0
+
+      // Delay
+      nodes.delay.wet.value = audioEffects.delay
+
+      // Modulation
+      nodes.chorus.wet.value = audioEffects.chorus
+      nodes.phaser.wet.value = audioEffects.phaser
+
+      // Bitcrusher
+      nodes.bitCrusher.bits.value = Math.max(1, 8 - Math.round(audioEffects.bitCrusher * 7))
+      nodes.bitCrusher.wet.value = audioEffects.bitCrusher > 0 ? 1 : 0 // True Bypass if 0
+
+      // Stereo Imaging
+      if (audioEffects.stereoWidth === 0.5) {
+        nodes.widener.wet.value = 0 // True Bypass if normal
+      } else {
+        nodes.widener.wet.value = 1
+        nodes.widener.width.value = audioEffects.stereoWidth * 2
+      }
+
+      nodes.autoPanner.wet.value = audioEffects.autoPan
+
+      // Dynamics & Tape Emulation
+      nodes.sidechain.wet.value = audioEffects.sidechainPump
+      nodes.autoWah.wet.value = audioEffects.autoWah
+
+      nodes.vibrato.depth.value = audioEffects.wowFlutter
+      nodes.vibrato.wet.value = audioEffects.wowFlutter > 0 ? 1 : 0 // True Bypass if 0
+
+      nodes.saturation.wet.value = audioEffects.tapeSaturation
+
+      // 1-Knob DJ Filter Logic
+      const filterVal = audioEffects.djFilter
+      const minLog = Math.log10(20)
+      const maxLog = Math.log10(20000)
+
+      if (filterVal < 0) {
+        nodes.djFilter.type = "lowpass"
+        nodes.djFilter.frequency.value = Math.pow(10, maxLog - Math.abs(filterVal) * (maxLog - minLog))
+      } else if (filterVal > 0) {
+        nodes.djFilter.type = "highpass"
+        nodes.djFilter.frequency.value = Math.pow(10, minLog + filterVal * (maxLog - minLog))
+      } else {
+        // Flat Bypass settings so it doesn't color the highs
+        nodes.djFilter.type = "lowpass"
+        nodes.djFilter.frequency.value = 22000
+      }
     }
   }, [audioEffects])
 
+
   // --------------------------------------------------------
-  // 4. DRY Library Fetching
+  // 5. Native DJ Performance Actions
+  // --------------------------------------------------------
+  const triggerTapeStop = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || !isPlaying) return;
+
+    const startRate = audio.playbackRate;
+    const durationMs = 1500;
+    const startTime = performance.now();
+
+    const animateStop = (time) => {
+      const elapsed = time - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      audio.playbackRate = Math.max(startRate * (1 - easeProgress), 0.01);
+
+      if (progress < 1) {
+        requestAnimationFrame(animateStop);
+      } else {
+        audio.pause();
+        setIsPlaying(false);
+        audio.playbackRate = playbackRate;
+      }
+    };
+    requestAnimationFrame(animateStop);
+  }, [isPlaying, playbackRate]);
+
+
+  // --------------------------------------------------------
+  // 6. Library Fetching & Navigation
   // --------------------------------------------------------
   const hydrateLibrary = useCallback((payload) => {
     const nextTracks = Array.isArray(payload?.tracks) ? payload.tracks : []
@@ -226,9 +351,6 @@ export function LocalPlayerProvider({ children }) {
     loadLibrary()
   }, [loadLibrary])
 
-  // --------------------------------------------------------
-  // 5. Playback Controls & Browser AudioContext Handling
-  // --------------------------------------------------------
   const ensureAudioContext = async () => {
     if (Tone.context.state !== 'running') {
       await Tone.start()
@@ -293,9 +415,6 @@ export function LocalPlayerProvider({ children }) {
     }
   }, [])
 
-  // --------------------------------------------------------
-  // 6. Data Formatting
-  // --------------------------------------------------------
   const albums = useMemo(() => {
     const byAlbum = new Map()
 
@@ -346,7 +465,7 @@ export function LocalPlayerProvider({ children }) {
   }, [tracks])
 
   // --------------------------------------------------------
-  // 7. Memoized Context Value (Performance Fix)
+  // 7. Context Provider Export
   // --------------------------------------------------------
   const value = useMemo(() => ({
     audioRef,
@@ -376,10 +495,11 @@ export function LocalPlayerProvider({ children }) {
     setPlaybackRate,
     audioEffects,
     setAudioEffects,
+    triggerTapeStop,
   }), [
     tracks, albums, currentIndex, isPlaying, currentTime, duration,
     volume, playbackRate, libraryPath, isLoadingLibrary, libraryError, audioEffects,
-    loadLibrary, refreshLibrary, selectTrack, playAlbum, togglePlay, prevTrack, nextTrack, seek
+    loadLibrary, refreshLibrary, selectTrack, playAlbum, togglePlay, prevTrack, nextTrack, seek, triggerTapeStop
   ])
 
   return (
