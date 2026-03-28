@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocalPlayer } from '../state/LocalPlayerContext';
+import { usePlayer } from '../state/PlayerContext';
 import './SettingsPage.css'; // Don't forget to import the CSS!
 
 function getCookie(name) {
@@ -45,7 +45,7 @@ export default function SettingsPage() {
   const [texturesEnabled, setTexturesEnabled] = useState(true);
   const [spotifyUser, setSpotifyUser] = useState(null);
   
-  const { audioEffects, setAudioEffects, playbackRate, setPlaybackRate, handleResetDefaults } = useLocalPlayer();
+  const { audioEffects, setAudioEffects, playbackRate, setPlaybackRate, handleResetDefaults, mode } = usePlayer();
 
   // Helpers for Displays
   const getStereoLabel = (val) => {
@@ -93,7 +93,8 @@ export default function SettingsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
         <h1 style={{ margin: 0, fontSize: '2rem', letterSpacing: '0.05em', color: '#fff' }}>SYSTEM SETUP</h1>
         
-        {/* Hardware Reset Button */}
+        {/* Hardware Reset Button — only in local mode */}
+        {mode === 'local' && (
         <button 
           onClick={handleResetDefaults}
           style={{
@@ -114,6 +115,7 @@ export default function SettingsPage() {
         >
           Reset to Analog Defaults
         </button>
+        )}
       </div>
 
       
@@ -137,7 +139,8 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 2. DJ & Dynamics Rack */}
+      {/* 2. DJ & Dynamics Rack — Local mode only */}
+      {mode === 'local' && (
       <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
         <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           DJ Performance & Dynamics
@@ -178,8 +181,10 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      )}
 
-      {/* 3. Analog Emulation Rack */}
+      {/* 3. Analog Tape & Lofi Rack — Local mode only */}
+      {mode === 'local' && (
       <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
         <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Vintage Analog Textures
@@ -224,8 +229,10 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      )}
 
-      {/* 4. Mastering & Spatial Rack */}
+      {/* 4. Mastering & Spatial Rack — Local mode only */}
+      {mode === 'local' && (
       <div className="settings-rack-panel" style={{ padding: '30px' }}>
         <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Spatial Imaging & Mastering
@@ -273,6 +280,7 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* 5. Spotify Integration */}
       <div className="settings-rack-panel" style={{ padding: '30px' }}>
@@ -292,13 +300,23 @@ export default function SettingsPage() {
               <h3 style={{ margin: 0, color: '#fff' }}>{spotifyUser.display_name}</h3>
               <p style={{ margin: '5px 0 0 0', color: '#888', fontSize: '0.9rem' }}>Followers: {spotifyUser.followers?.total || 0}</p>
             </div>
-            <div style={{ flex: 1, textAlign: 'right' }}>
+            <div style={{ flex: 1, textAlign: 'right', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button 
                 type="button"
                 onClick={() => window.open(spotifyUser.external_urls?.spotify, '_blank')}
                 style={{ background: 'linear-gradient(145deg, #1ed760, #1db954)', color: '#000', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 View Profile
+              </button>
+              <button 
+                type="button"
+                onClick={async () => {
+                  await fetch('/api/auth/logout');
+                  setSpotifyUser(null);
+                }}
+                style={{ background: 'linear-gradient(145deg, #333, #222)', color: '#e35a5a', border: '1px solid #444', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                Disconnect
               </button>
             </div>
           </div>

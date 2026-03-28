@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocalPlayer } from '../state/LocalPlayerContext'
+import { usePlayer } from '../state/PlayerContext'
 import gsap from 'gsap'
 import vinylImage from '../assets/Vinyl.png'
 import coverOverlay1 from '../assets/1.png'
@@ -19,7 +19,7 @@ function getCookie(name) {
 }
 
 export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
-  const { playGlobalTrack, selectTrack } = useLocalPlayer()
+  const { playGlobalTrack, selectTrack } = usePlayer()
   const [comboMode, setComboMode] = useState('grid')
   const enableTextures = getCookie('enableAlbumTextures') !== 'false'
   const [comboCarouselIndex, setComboCarouselIndex] = useState(0)

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useLocalPlayer } from '../state/LocalPlayerContext';
+import { usePlayer } from '../state/PlayerContext';
 import './PlaylistsPage.css';
 
 export default function PlaylistsPage() {
-  const { loadPlaylist } = useLocalPlayer();
+  const { loadPlaylist, mode } = usePlayer();
   const [playlists, setPlaylists] = useState([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,10 +27,24 @@ export default function PlaylistsPage() {
   const fetchPlaylists = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/playlists');
-      if (!response.ok) throw new Error('Failed to fetch playlists');
-      const data = await response.json();
-      setPlaylists(data);
+      if (mode === 'spotify') {
+        const response = await fetch('/api/auth/spotify/playlists?limit=50');
+        if (!response.ok) throw new Error('Failed to fetch Spotify playlists');
+        const data = await response.json();
+        const items = (data.items || []).map(p => ({
+          name: p.name,
+          filename: p.id,
+          spotifyUri: p.uri,
+          imageUrl: p.images?.[0]?.url || null,
+          trackCount: p.tracks?.total || 0,
+        }));
+        setPlaylists(items);
+      } else {
+        const response = await fetch('/api/playlists');
+        if (!response.ok) throw new Error('Failed to fetch playlists');
+        const data = await response.json();
+        setPlaylists(data);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -41,10 +55,29 @@ export default function PlaylistsPage() {
   const handleSelectPlaylist = async (playlist) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/playlists/${encodeURIComponent(playlist.filename)}`);
-      if (!response.ok) throw new Error('Failed to load playlist tracks');
-      const data = await response.json();
-      setSelectedPlaylist(data);
+      if (mode === 'spotify' && playlist.spotifyUri) {
+        const id = playlist.spotifyUri.split(':').pop();
+        const response = await fetch(`/api/auth/spotify/playlists/${id}/tracks?limit=100`);
+        if (!response.ok) throw new Error('Failed to load Spotify playlist tracks');
+        const data = await response.json();
+        const tracks = (data.items || [])
+          .filter(item => item?.track)
+          .map(item => ({
+            id: item.track.id,
+            title: item.track.name,
+            artist: item.track.artists?.map(a => a.name).join(', ') || 'Unknown',
+            album: item.track.album?.name || 'Unknown Album',
+            coverUrl: item.track.album?.images?.[0]?.url || null,
+            spotifyUri: item.track.uri,
+            filename: item.track.name,
+          }));
+        setSelectedPlaylist({ name: playlist.name, tracks, spotifyUri: playlist.spotifyUri });
+      } else {
+        const response = await fetch(`/api/playlists/${encodeURIComponent(playlist.filename)}`);
+        if (!response.ok) throw new Error('Failed to load playlist tracks');
+        const data = await response.json();
+        setSelectedPlaylist(data);
+      }
     } catch (err) {
       setError(err.message);
     } finally {

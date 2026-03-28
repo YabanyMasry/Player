@@ -32,11 +32,11 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter)
 
 // --- LOCAL MUSIC PATH CONFIGURATION ---
-const ALBUMS_ROOT = process.env.ALBUMS_ROOT;
-const PLAYLISTS_ROOT = process.env.PLAYLISTS_ROOT || (ALBUMS_ROOT ? path.join(ALBUMS_ROOT, '..', 'Playlists') : '');
+const ALBUMS_ROOT = process.env.ALBUMS_ROOT || (process.env.VITE_PLAYER_MODE === 'spotify' ? process.cwd() : '');
+const PLAYLISTS_ROOT = process.env.PLAYLISTS_ROOT || (ALBUMS_ROOT ? path.join(ALBUMS_ROOT, '..', 'Playlists') : process.cwd());
 
-if (!ALBUMS_ROOT) {
-  console.error('\x1b[31m%s\x1b[0m', '❌ CRITICAL ERROR: ALBUMS_ROOT is not defined in .env! Cannot start the server.');
+if (!ALBUMS_ROOT && process.env.VITE_PLAYER_MODE !== 'spotify') {
+  console.error('\x1b[31m%s\x1b[0m', '❌ CRITICAL ERROR: ALBUMS_ROOT is not defined in .env! Cannot start the server in local mode.');
   process.exit(1);
 }
 

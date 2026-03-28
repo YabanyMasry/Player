@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { useLocalPlayer } from '../state/LocalPlayerContext'
+import { usePlayer } from '../state/PlayerContext'
 import { usePlayerScale } from '../hooks/usePlayerScale' // Adjust path as needed
 import VinylPlayer from '../components/VinylPlayer'
 import StudioFooter from '../components/StudioFooter'
@@ -33,7 +33,7 @@ export default function VinylPlayerPage() {
     audioEffects,
     setAudioEffects,
     handleResetDefaults,
-  } = useLocalPlayer()
+  } = usePlayer()
 
   // 1. Define the hardcoded CSS dimensions of your VinylPlayer
   const PLAYER_WIDTH = 1048;  // Change to your actual fixed width

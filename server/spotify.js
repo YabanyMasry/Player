@@ -35,7 +35,7 @@ export function initSpotify(albumsRoot, playlistsRoot, port) {
   const baseUrl = process.env.BASE_URL || `http://127.0.0.1:${PORT}`;
   REDIRECT_URI = `${baseUrl}/api/auth/callback`;
   
-  TOKENS_PATH = path.join(ALBUMS_ROOT, '..', 'spotify_tokens.json');
+  TOKENS_PATH = path.join(process.cwd(), 'spotify_tokens.json');
   return loadTokens();
 }
 
@@ -244,7 +244,15 @@ export async function getSpotifyPlaylistTracks(playlistId) {
 // --- AUTH ROUTES ---
 
 router.get('/login', (req, res) => {
-  const scope = 'playlist-read-private playlist-read-collaborative';
+  const scope = [
+    'playlist-read-private',
+    'playlist-read-collaborative',
+    'streaming',
+    'user-read-playback-state',
+    'user-modify-playback-state',
+    'user-read-currently-playing',
+    'user-library-read',
+  ].join(' ');
   const spotifyUrl = `https://accounts.spotify.com/authorize?` + new URLSearchParams({
     response_type: 'code',
     client_id: SPOTIFY_CLIENT_ID,
@@ -285,7 +293,9 @@ router.get('/callback', async (req, res) => {
       expires_at: Date.now() + (data.expires_in * 1000)
     };
     await saveTokens();
-    res.send('<h1>Login Successful!</h1><p>You can now close this window and try importing again.</p>');
+    // Redirect back to the app settings page instead of showing a raw HTML page
+    const baseUrl = process.env.BASE_URL || `http://127.0.0.1:${PORT}`;
+    res.redirect(`${baseUrl}/settings`);
   } catch (error) {
     res.status(500).send(`Auth Error: ${error.message}`);
   }
@@ -296,6 +306,24 @@ router.get('/status', (req, res) => {
     authenticated: !!(spotifyAuth.access_token && spotifyAuth.expires_at > Date.now()),
     hasRefreshToken: !!spotifyAuth.refresh_token
   });
+});
+
+router.get('/token', async (req, res) => {
+  try {
+    const token = await getSpotifyToken();
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+    res.json({ access_token: token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/logout', async (req, res) => {
+  spotifyAuth = { access_token: null, refresh_token: null, expires_at: 0 };
+  try {
+    await fs.unlink(TOKENS_PATH);
+  } catch { /* file may not exist */ }
+  res.json({ success: true });
 });
 
 router.get('/me', async (req, res) => {
@@ -325,6 +353,61 @@ router.get('/me', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// --- SPOTIFY API PROXY ROUTES ---
+
+async function spotifyProxy(req, res, spotifyPath) {
+  try {
+    let token = await getSpotifyToken();
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+    let response = await fetch(`https://api.spotify.com/v1${spotifyPath}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      token = await getSpotifyToken(true);
+      if (!token) return res.status(401).json({ error: 'Token refresh failed' });
+      response = await fetch(`https://api.spotify.com/v1${spotifyPath}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: errorText });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+router.get('/spotify/albums', (req, res) => {
+  const limit = req.query.limit || 50;
+  const offset = req.query.offset || 0;
+  spotifyProxy(req, res, `/me/albums?limit=${limit}&offset=${offset}`);
+});
+
+router.get('/spotify/playlists', (req, res) => {
+  const limit = req.query.limit || 50;
+  const offset = req.query.offset || 0;
+  spotifyProxy(req, res, `/me/playlists?limit=${limit}&offset=${offset}`);
+});
+
+router.get('/spotify/playlists/:id/tracks', (req, res) => {
+  const limit = req.query.limit || 100;
+  const offset = req.query.offset || 0;
+  spotifyProxy(req, res, `/playlists/${req.params.id}/tracks?limit=${limit}&offset=${offset}`);
+});
+
+router.get('/spotify/tracks', (req, res) => {
+  const limit = req.query.limit || 50;
+  const offset = req.query.offset || 0;
+  spotifyProxy(req, res, `/me/tracks?limit=${limit}&offset=${offset}`);
 });
 
 export default router;

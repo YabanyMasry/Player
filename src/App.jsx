@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { useLocalPlayer } from './state/LocalPlayerContext'
+import { usePlayer } from './state/PlayerContext'
 import StudioNav from './components/StudioNav'
 import AlbumsPage from './pages/AlbumsPage'
 import VinylPlayerPage from './pages/VinylPlayerPage'
@@ -16,7 +16,7 @@ const navItems = [
 ]
 
 export default function App() {
-  const { libraryPath, isLoadingLibrary, libraryError, refreshLibrary } = useLocalPlayer()
+  const { libraryPath, isLoadingLibrary, libraryError, refreshLibrary, mode } = usePlayer()
   const location = useLocation()
 
   return (
@@ -35,17 +35,22 @@ export default function App() {
     <Route path="/settings" element={<SettingsPage />} />
   </Routes>
 
+
       <footer className="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          {libraryError
-            ? `Library error: ${libraryError}`
-            : libraryPath
-              ? `Library: ${libraryPath}`
-              : 'Waiting for backend library scan...'}
+          {mode === 'spotify'
+            ? (libraryError ? `Spotify error: ${libraryError}` : 'Connected to Spotify')
+            : (libraryError
+              ? `Library error: ${libraryError}`
+              : libraryPath
+                ? `Library: ${libraryPath}`
+                : 'Waiting for backend library scan...')}
         </div>
+        {mode === 'local' && (
         <button type="button" className="primary" onClick={refreshLibrary} disabled={isLoadingLibrary} style={{ padding: '4px 12px', fontSize: '0.85rem' }}>
           {isLoadingLibrary ? 'Refreshing...' : 'Refresh'}
         </button>
+        )}
       </footer>
     </div>
   )

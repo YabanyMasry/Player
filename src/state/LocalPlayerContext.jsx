@@ -1,7 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Tone from 'tone'
-
-const LocalPlayerContext = createContext(null)
+import { PlayerContext, usePlayer } from './PlayerContext'
 
 export function LocalPlayerProvider({ children }) {
   const [globalTracks, setGlobalTracks] = useState([])
@@ -553,6 +552,9 @@ export function LocalPlayerProvider({ children }) {
     audioEffects,
     setAudioEffects,
     triggerTapeStop,
+    mode: 'local',
+    spotifyUser: null,
+    spotifyDeviceId: null,
   }), [
     tracks, albums, activePlaylist, currentIndex, isPlaying, currentTime, duration,
     volume, playbackRate, libraryPath, isLoadingLibrary, libraryError, audioEffects,
@@ -560,17 +562,12 @@ export function LocalPlayerProvider({ children }) {
   ])
 
   return (
-    <LocalPlayerContext.Provider value={value}>
+    <PlayerContext.Provider value={value}>
       <audio ref={audioRef} crossOrigin="anonymous" />
       {children}
-    </LocalPlayerContext.Provider>
+    </PlayerContext.Provider>
   )
 }
 
-export function useLocalPlayer() {
-  const context = useContext(LocalPlayerContext)
-  if (!context) {
-    throw new Error('useLocalPlayer must be used inside LocalPlayerProvider')
-  }
-  return context
-}
+// Backward-compat alias — use usePlayer() in new code
+export const useLocalPlayer = usePlayer

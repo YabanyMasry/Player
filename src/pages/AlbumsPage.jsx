@@ -1,9 +1,9 @@
-import { useLocalPlayer } from '../state/LocalPlayerContext'
+import { usePlayer } from '../state/PlayerContext'
 import AlbumGridCarousel from '../components/AlbumGridCarousel'
 import './AlbumsPage.css'
 
 export default function AlbumsPage() {
-  const { albums } = useLocalPlayer()
+  const { albums } = usePlayer()
 
   return (
     <main className="panel albums-page">
