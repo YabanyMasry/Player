@@ -9,4 +9,9 @@
   border: none !important;
   border-radius: 0 !important;
   padding-top: 55px !important;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.albums-page::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Webkit */
 }

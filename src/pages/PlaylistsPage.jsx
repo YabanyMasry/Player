@@ -37,7 +37,7 @@ export default function PlaylistsPage() {
           const response = await fetch(`/api/auth/spotify/playlists?limit=${limit}&offset=${offset}`);
           if (!response.ok) throw new Error('Failed to fetch Spotify playlists');
           const data = await response.json();
-          
+
           total = data.total || 0;
           const items = data.items || [];
           if (items.length === 0) break;
@@ -108,37 +108,37 @@ export default function PlaylistsPage() {
 
   const handleImportSpotify = async () => {
     if (!spotifyUrl.trim()) return;
-    
+
     setImportStatus({ loading: true, message: 'SYNCING API...', type: 'loading' });
-    
+
     try {
       const response = await fetch('/api/playlists/import-spotify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ spotifyUrl: spotifyUrl.trim() })
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Import failed');
       }
-      
-      setImportStatus({ 
-        loading: false, 
-        message: `OK: ${data.matchedCount}/${data.totalCount} -> ${data.playlistName}`, 
-        type: 'success' 
+
+      setImportStatus({
+        loading: false,
+        message: `OK: ${data.matchedCount}/${data.totalCount} -> ${data.playlistName}`,
+        type: 'success'
       });
       setSpotifyUrl('');
-      
+
       // Refresh the playlists list
       fetchPlaylists();
-      
+
     } catch (error) {
-      setImportStatus({ 
-        loading: false, 
-        message: `ERR: ${error.message.toUpperCase()}`, 
-        type: 'error' 
+      setImportStatus({
+        loading: false,
+        message: `ERR: ${error.message.toUpperCase()}`,
+        type: 'error'
       });
     }
   };
@@ -167,7 +167,7 @@ export default function PlaylistsPage() {
           <div className="rack-import-section" style={{ marginBottom: '24px', padding: '12px', background: 'linear-gradient(135deg, #181818, #0a0a0a)', border: '1px solid #000', borderRadius: '4px', boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8)' }}>
             <div style={{ fontSize: '0.75rem', color: '#888', fontFamily: 'monospace', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
               <span>SPOTIFY DATA SYNC</span>
-              <a 
+              <a
                 href="http://127.0.0.1:4174/api/auth/login"
                 style={{ color: authStatus.authenticated ? '#4ade80' : '#1db954', textDecoration: 'none' }}
               >
@@ -175,9 +175,9 @@ export default function PlaylistsPage() {
               </a>
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <input 
-                type="text" 
-                placeholder="https://open.spotify.com/playlist/..." 
+              <input
+                type="text"
+                placeholder="https://open.spotify.com/playlist/..."
                 value={spotifyUrl}
                 onChange={(e) => setSpotifyUrl(e.target.value)}
                 disabled={importStatus.loading}
@@ -194,7 +194,7 @@ export default function PlaylistsPage() {
                   minWidth: '0'
                 }}
               />
-              <button 
+              <button
                 onClick={handleImportSpotify}
                 disabled={importStatus.loading || !spotifyUrl.trim()}
                 style={{
@@ -216,7 +216,7 @@ export default function PlaylistsPage() {
               &gt; {importStatus.message}
             </div>
           </div>
-          
+
           <div className="rack-slots">
             {playlists.length === 0 ? (
               <p className="muted">No playlists found.</p>
@@ -244,8 +244,8 @@ export default function PlaylistsPage() {
                   <h2>{selectedPlaylist.name}</h2>
                   <p className="muted">{selectedPlaylist.tracks.length} Tracks</p>
                 </div>
-                <button 
-                  className="primary play-btn" 
+                <button
+                  className="play-btn"
                   onClick={handlePlayPlaylist}
                   disabled={selectedPlaylist.tracks.length === 0}
                 >
@@ -276,7 +276,7 @@ export default function PlaylistsPage() {
                       <tr>
                         <td colSpan="4" className="muted text-center">Playlist is empty or tracks are missing locally.</td>
                       </tr>
-                    ) }
+                    )}
                   </tbody>
                 </table>
               </div>
