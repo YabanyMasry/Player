@@ -26,15 +26,30 @@ let spotifyAuth = {
   expires_at: 0
 };
 
-export function initSpotify(albumsRoot, playlistsRoot, port) {
+let refreshTimerId = null;
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 minutes before expiry
+const TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000; // Background refresh every 45 min
+
+export async function initSpotify(albumsRoot, playlistsRoot, port) {
   ALBUMS_ROOT = albumsRoot;
   PLAYLISTS_ROOT = playlistsRoot;
   PORT = port;
   
-  const baseUrl = process.env.BASE_URL || `http://127.0.0.1:${PORT}`;
-  
   TOKENS_PATH = path.join(process.cwd(), 'spotify_tokens.json');
-  return loadTokens();
+  await loadTokens();
+
+  // Immediately refresh if we have a refresh token (ensures fresh token on startup)
+  if (spotifyAuth.refresh_token) {
+    try {
+      await getSpotifyToken(true);
+      console.log('[Spotify] Token refreshed on startup.');
+    } catch (err) {
+      console.warn('[Spotify] Could not refresh token on startup:', err.message);
+    }
+  }
+
+  // Start background auto-refresh loop
+  startAutoRefresh();
 }
 
 // --- TOKEN MANAGEMENT ---
@@ -54,7 +69,9 @@ async function saveTokens() {
 }
 
 export async function getSpotifyToken(forceRefresh = false) {
-  if (!forceRefresh && spotifyAuth.access_token && spotifyAuth.expires_at > Date.now()) {
+  // Refresh proactively when within the buffer window (5 min before actual expiry)
+  const isValid = spotifyAuth.access_token && (spotifyAuth.expires_at - TOKEN_REFRESH_BUFFER_MS) > Date.now();
+  if (!forceRefresh && isValid) {
     return spotifyAuth.access_token;
   }
 
@@ -108,6 +125,20 @@ export async function getSpotifyToken(forceRefresh = false) {
 
   const data = await response.json();
   return data.access_token;
+}
+
+function startAutoRefresh() {
+  if (refreshTimerId) clearInterval(refreshTimerId);
+  refreshTimerId = setInterval(async () => {
+    if (!spotifyAuth.refresh_token) return;
+    try {
+      await getSpotifyToken(true);
+      console.log('[Spotify] Background token auto-refresh successful.');
+    } catch (err) {
+      console.warn('[Spotify] Background auto-refresh failed:', err.message);
+    }
+  }, TOKEN_REFRESH_INTERVAL_MS);
+  console.log('[Spotify] Auto-refresh timer started (every 45 min).');
 }
 
 // --- PLAYLIST EXTRACTION ENGINE ---
@@ -254,11 +285,12 @@ router.get('/login', (req, res) => {
     'playlist-read-private',
     'playlist-read-collaborative',
     'streaming',
+    'user-read-email',
+    'user-read-private',
     'user-read-playback-state',
     'user-modify-playback-state',
     'user-read-currently-playing',
     'user-library-read',
-    'user-read-private',
   ].join(' ');
   const spotifyUrl = `https://accounts.spotify.com/authorize?` + new URLSearchParams({
     response_type: 'code',

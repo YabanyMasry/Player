@@ -136,9 +136,18 @@ export function SpotifyPlayerProvider({ children }) {
         console.error('[Spotify SDK] Init error:', message)
         setLibraryError(`Spotify SDK init failed: ${message}`)
       })
-      player.addListener('authentication_error', ({ message }) => {
-        console.error('[Spotify SDK] Auth error:', message)
-        setLibraryError('Spotify authentication failed. Please re-login.')
+      player.addListener('authentication_error', async ({ message }) => {
+        console.warn('[Spotify SDK] Auth error:', message, '— attempting auto-refresh...')
+        // Try to get a fresh token from the server (triggers server-side refresh)
+        const freshToken = await fetchToken()
+        if (freshToken) {
+          console.log('[Spotify SDK] Got fresh token, reconnecting...')
+          // The SDK will call getOAuthToken on the next connect attempt
+          player.disconnect()
+          setTimeout(() => player.connect(), 1000)
+        } else {
+          setLibraryError('Spotify authentication failed. Please re-login via Settings.')
+        }
       })
       player.addListener('account_error', ({ message }) => {
         console.error('[Spotify SDK] Account error:', message)
