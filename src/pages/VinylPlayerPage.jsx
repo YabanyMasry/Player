@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { useLocalPlayer } from '../state/LocalPlayerContext'
 import VinylPlayer from '../components/VinylPlayer'
 import StudioFooter from '../components/StudioFooter'
@@ -69,30 +69,80 @@ export default function VinylPlayerPage() {
 
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0
 
+  /* ── Scaling Logic ── */
+  const [scale, setScale] = useState(1)
+  const stageRef = useRef(null)
+
+  useEffect(() => {
+    const updateScale = () => {
+      if (!stageRef.current) return
+
+      const stage = stageRef.current
+      const containerWidth = stage.clientWidth
+      const containerHeight = stage.clientHeight
+
+      // Estimated space for the tracklist panel (typically 380px + gap)
+      // On small screens, the tracklist might hide or change, so we measure it if possible
+      const tracklist = stage.querySelector('.vp-tracklist-panel')
+      const tracklistWidth = tracklist ? tracklist.offsetWidth : 0
+      const gap = 80
+      const paddingH = 80 // 40px each side
+
+      const availableWidth = containerWidth - tracklistWidth - gap - paddingH
+      const availableHeight = containerHeight - 40 // some buffer for vertical padding
+
+      const targetWidth = 1048
+      const targetHeight = 618
+
+      const scaleX = availableWidth / targetWidth
+      const scaleY = availableHeight / targetHeight
+
+      // Set scale, capped at 1.0 (don't upscale beyond native size unless desired)
+      // Actually, for "same on all browsers", scaling up might be okay, but let's cap at 1.1 or so
+      const newScale = Math.min(scaleX, scaleY)
+      setScale(Math.min(newScale, 1.1))
+    }
+
+    const observer = new ResizeObserver(updateScale)
+    if (stageRef.current) observer.observe(stageRef.current)
+
+    updateScale()
+    window.addEventListener('resize', updateScale)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateScale)
+    }
+  }, [])
+
   return (
     <div className="vp-page">
       {/* ── center stage ─────────────────────────────────────── */}
-      <div className="vp-stage">
-        <VinylPlayer
-          isPlaying={isPlaying}
-          coverUrl={currentTrack?.coverUrl || currentAlbum?.coverUrl}
-          audioElement={audioRef?.current}
-          trackNumber={relativeTrackNum}
-          songName={currentTrack?.title || currentTrack?.filename || 'Unknown'}
-          albumName={currentAlbum?.album || ''}
-          volume={volume}
-          onVolumeChange={setVolume}
-          playbackRate={playbackRate}
-          onPlaybackRateChange={setPlaybackRate}
-          audioEffects={audioEffects}
-          onEffectChange={handleEffectChange}
-          onPrevAlbum={onPrevAlbum}
-          onNextAlbum={onNextAlbum}
-          onTogglePlay={togglePlay}
-          lyrics={currentTrack?.lyrics}
-          currentTime={currentTime}
-          onSeek={seek}
-        />
+      <div className="vp-stage" ref={stageRef}>
+        <div 
+          className="vp-player-scaler"
+          style={{ transform: `scale(${scale})` }}
+        >
+          <VinylPlayer
+            isPlaying={isPlaying}
+            coverUrl={currentTrack?.coverUrl || currentAlbum?.coverUrl}
+            audioElement={audioRef?.current}
+            trackNumber={relativeTrackNum}
+            songName={currentTrack?.title || currentTrack?.filename || 'Unknown'}
+            albumName={currentAlbum?.album || ''}
+            volume={volume}
+            onVolumeChange={setVolume}
+            playbackRate={playbackRate}
+            onPlaybackRateChange={setPlaybackRate}
+            audioEffects={audioEffects}
+            onEffectChange={handleEffectChange}
+            onPrevAlbum={onPrevAlbum}
+            onNextAlbum={onNextAlbum}
+            onTogglePlay={togglePlay}
+            lyrics={currentTrack?.lyrics}
+            currentTime={currentTime}
+            onSeek={seek}
+          />
+        </div>
 
         {/* ── right tracklist ── */}
         {currentAlbum && (

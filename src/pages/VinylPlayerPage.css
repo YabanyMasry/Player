@@ -23,6 +23,17 @@
   overflow: hidden;
 }
 
+.vp-player-scaler {
+  width: 1048px;
+  height: 618px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  transition: transform 0.2s ease-out;
+}
+
 /* ── right tracklist panel ───────────────────────────────────── */
 
 .vp-tracklist-panel {
