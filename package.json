@@ -11,7 +11,7 @@
     "start": "node server/index.js",
     "dev": "vite",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
-    "build": "vite build",
+    "build": "npx vite build",
     "preview": "vite preview"
   },
   "dependencies": {
