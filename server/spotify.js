@@ -258,6 +258,7 @@ router.get('/login', (req, res) => {
     'user-modify-playback-state',
     'user-read-currently-playing',
     'user-library-read',
+    'user-read-private',
   ].join(' ');
   const spotifyUrl = `https://accounts.spotify.com/authorize?` + new URLSearchParams({
     response_type: 'code',
@@ -408,7 +409,7 @@ router.get('/spotify/playlists', (req, res) => {
 router.get('/spotify/playlists/:id/tracks', (req, res) => {
   const limit = req.query.limit || 100;
   const offset = req.query.offset || 0;
-  spotifyProxy(req, res, `/playlists/${req.params.id}/items?limit=${limit}&offset=${offset}`);
+  spotifyProxy(req, res, `/playlists/${req.params.id}/items?limit=${limit}&offset=${offset}&additional_types=track`);
 });
 
 router.get('/spotify/tracks', (req, res) => {
