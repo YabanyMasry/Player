@@ -1,11 +1,9 @@
-import { useCallback, useState, useEffect, useRef } from 'react'
+import { useCallback } from 'react'
 import { useLocalPlayer } from '../state/LocalPlayerContext'
+import { usePlayerScale } from '../hooks/usePlayerScale' // Adjust path as needed
 import VinylPlayer from '../components/VinylPlayer'
 import StudioFooter from '../components/StudioFooter'
 import './VinylPlayerPage.css'
-
-/* ── helpers ─────────────────────────────────────────────────── */
-
 
 /* ── main page ───────────────────────────────────────────────── */
 
@@ -35,11 +33,16 @@ export default function VinylPlayerPage() {
     setAudioEffects,
   } = useLocalPlayer()
 
+  // 1. Define the hardcoded CSS dimensions of your VinylPlayer
+  const PLAYER_WIDTH = 1048;  // Change to your actual fixed width
+  const PLAYER_HEIGHT = 650; // Change to your actual fixed height
+  
+  // 2. Get the current scale factor
+  const playerScale = usePlayerScale(PLAYER_WIDTH, PLAYER_HEIGHT);
+
   const handleEffectChange = useCallback((key, value) => {
     setAudioEffects(prev => ({ ...prev, [key]: value }))
   }, [setAudioEffects])
-
-
 
   /* ── current album info ────────────────────────────────────── */
 
@@ -67,84 +70,56 @@ export default function VinylPlayerPage() {
     playAlbum(albums[nextIdx].album);
   }, [albums, currentAlbum, playAlbum]);
 
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0
-
-  /* ── Scaling Logic ── */
-  const [scale, setScale] = useState(1)
-  const stageRef = useRef(null)
-
-  useEffect(() => {
-    const updateScale = () => {
-      if (!stageRef.current) return
-
-      const stage = stageRef.current
-      const containerWidth = stage.clientWidth
-      const containerHeight = stage.clientHeight
-
-      // Estimated space for the tracklist panel (typically 380px + gap)
-      // On small screens, the tracklist might hide or change, so we measure it if possible
-      const tracklist = stage.querySelector('.vp-tracklist-panel')
-      const tracklistWidth = tracklist ? tracklist.offsetWidth : 0
-      const gap = 80
-      const paddingH = 80 // 40px each side
-
-      const availableWidth = containerWidth - tracklistWidth - gap - paddingH
-      const availableHeight = containerHeight - 40 // some buffer for vertical padding
-
-      const targetWidth = 1048
-      const targetHeight = 618
-
-      const scaleX = availableWidth / targetWidth
-      const scaleY = availableHeight / targetHeight
-
-      // Set scale, capped at 1.0 (don't upscale beyond native size unless desired)
-      // Actually, for "same on all browsers", scaling up might be okay, but let's cap at 1.1 or so
-      const newScale = Math.min(scaleX, scaleY)
-      setScale(Math.min(newScale, 1.1))
-    }
-
-    const observer = new ResizeObserver(updateScale)
-    if (stageRef.current) observer.observe(stageRef.current)
-
-    updateScale()
-    window.addEventListener('resize', updateScale)
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', updateScale)
-    }
-  }, [])
-
   return (
     <div className="vp-page">
       {/* ── center stage ─────────────────────────────────────── */}
-      <div className="vp-stage" ref={stageRef}>
+      <div className="vp-stage" style={{ display: 'flex', gap: '2rem' }}>
+        
+        {/* ── THE SCALED WRAPPER ── */}
+        {/* This div dynamically changes its actual DOM size so the tracklist stays hugged against it */}
         <div 
-          className="vp-player-scaler"
-          style={{ transform: `scale(${scale})` }}
+          className="vp-scaled-container"
+          style={{ 
+            width: `${PLAYER_WIDTH * playerScale}px`, 
+            height: `${PLAYER_HEIGHT * playerScale}px`,
+            position: 'relative',
+            flexShrink: 0 // Prevents the flex parent from crushing it
+          }}
         >
-          <VinylPlayer
-            isPlaying={isPlaying}
-            coverUrl={currentTrack?.coverUrl || currentAlbum?.coverUrl}
-            audioElement={audioRef?.current}
-            trackNumber={relativeTrackNum}
-            songName={currentTrack?.title || currentTrack?.filename || 'Unknown'}
-            albumName={currentAlbum?.album || ''}
-            volume={volume}
-            onVolumeChange={setVolume}
-            playbackRate={playbackRate}
-            onPlaybackRateChange={setPlaybackRate}
-            audioEffects={audioEffects}
-            onEffectChange={handleEffectChange}
-            onPrevAlbum={onPrevAlbum}
-            onNextAlbum={onNextAlbum}
-            onTogglePlay={togglePlay}
-            lyrics={currentTrack?.lyrics}
-            currentTime={currentTime}
-            onSeek={seek}
-          />
+          {/* This inner div applies the visual zoom from the top-left corner */}
+          <div style={{
+            width: `${PLAYER_WIDTH}px`,
+            height: `${PLAYER_HEIGHT}px`,
+            transform: `scale(${playerScale})`,
+            transformOrigin: 'top left',
+            position: 'absolute',
+            top: 0,
+            left: 0
+          }}>
+            <VinylPlayer
+              isPlaying={isPlaying}
+              coverUrl={currentTrack?.coverUrl || currentAlbum?.coverUrl}
+              audioElement={audioRef?.current}
+              trackNumber={relativeTrackNum}
+              songName={currentTrack?.title || currentTrack?.filename || 'Unknown'}
+              albumName={currentAlbum?.album || ''}
+              volume={volume}
+              onVolumeChange={setVolume}
+              playbackRate={playbackRate}
+              onPlaybackRateChange={setPlaybackRate}
+              audioEffects={audioEffects}
+              onEffectChange={handleEffectChange}
+              onPrevAlbum={onPrevAlbum}
+              onNextAlbum={onNextAlbum}
+              onTogglePlay={togglePlay}
+              lyrics={currentTrack?.lyrics}
+              currentTime={currentTime}
+              onSeek={seek}
+            />
+          </div>
         </div>
 
-        {/* ── right tracklist ── */}
+        {/* ── right tracklist (Leaves this untouched) ── */}
         {currentAlbum && (
           <aside className="vp-tracklist-panel">
             <h3>{currentAlbum.album}</h3>
