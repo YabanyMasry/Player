@@ -368,15 +368,22 @@ router.get('/me', async (req, res) => {
 async function spotifyProxy(req, res, spotifyPath) {
   try {
     let token = await getSpotifyToken();
-    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+    if (!token) {
+      console.log(`[Spotify Proxy] Fail: Not authenticated, requested ${spotifyPath}`);
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
 
+    console.log(`[Spotify Proxy] Requesting: https://api.spotify.com/v1${spotifyPath}`);
     let response = await fetch(`https://api.spotify.com/v1${spotifyPath}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
     if (response.status === 401 || response.status === 403) {
+      console.log(`[Spotify Proxy] Received ${response.status}, attempting token refresh...`);
       token = await getSpotifyToken(true);
       if (!token) return res.status(401).json({ error: 'Token refresh failed' });
+      
+      console.log(`[Spotify Proxy] Retrying with new token: https://api.spotify.com/v1${spotifyPath}`);
       response = await fetch(`https://api.spotify.com/v1${spotifyPath}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -384,12 +391,15 @@ async function spotifyProxy(req, res, spotifyPath) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[Spotify Proxy] ❌ API ERROR [${response.status}] for ${spotifyPath}:`, errorText);
       return res.status(response.status).json({ error: errorText });
     }
 
     const data = await response.json();
+    console.log(`[Spotify Proxy] ✅ Success [${response.status}] for ${spotifyPath}`);
     res.json(data);
   } catch (err) {
+    console.error(`[Spotify Proxy] 🚨 Fatal Exception:`, err);
     res.status(500).json({ error: err.message });
   }
 }
