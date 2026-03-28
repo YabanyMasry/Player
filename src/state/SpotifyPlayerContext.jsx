@@ -13,6 +13,26 @@ import { PlayerContext } from './PlayerContext'
 
 const SPOTIFY_SDK_URL = 'https://sdk.scdn.co/spotify-player.js'
 
+function parseLrcText(text) {
+  const rows = [];
+  const lines = String(text || '').split(/\r?\n/);
+  for (const line of lines) {
+    const timestamps = [...line.matchAll(/\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g)];
+    if (!timestamps.length) continue;
+    const lyricText = line.replace(/\[[^\]]+\]/g, '').trim();
+    for (const stamp of timestamps) {
+      const min = Number.parseInt(stamp[1], 10);
+      const sec = Number.parseInt(stamp[2], 10);
+      const fractionRaw = stamp[3] ?? '0';
+      const fraction = Number.parseInt(fractionRaw.padEnd(3, '0').slice(0, 3), 10);
+      const time = min * 60 + sec + fraction / 1000;
+      rows.push({ time, text: lyricText || '...' });
+    }
+  }
+  rows.sort((a, b) => a.time - b.time);
+  return rows;
+}
+
 export function SpotifyPlayerProvider({ children }) {
   // -- Core playback state --
   const [tracks, setTracks] = useState([])
@@ -210,6 +230,65 @@ export function SpotifyPlayerProvider({ children }) {
       }
     }
   }, [isPlaying])
+
+  // --------------------------------------------------------
+  // 4b. Fetch Lyrics from lrclib.net
+  // --------------------------------------------------------
+  useEffect(() => {
+    if (currentIndex === null || !tracks[currentIndex]) return;
+    
+    const track = tracks[currentIndex];
+    // If we already fetched or attempted to fetch lyrics, don't do it again
+    if (track.lyrics !== undefined) return;
+
+    let isSubscribed = true;
+
+    async function fetchLyrics() {
+      try {
+        const url = new URL('https://lrclib.net/api/get');
+        url.searchParams.append('track_name', track.title);
+        url.searchParams.append('artist_name', track.artist);
+        if (track.album && track.album !== 'Unknown Album') {
+          url.searchParams.append('album_name', track.album);
+        }
+
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error('Lyrics not found');
+        const data = await res.json();
+        
+        if (isSubscribed) {
+          const lyricsRows = data?.syncedLyrics ? parseLrcText(data.syncedLyrics) : [];
+          setTracks(prev => {
+             const newTracks = [...prev];
+             // Make sure we are updating the SAME track we fetched for, in case currentIndex changed
+             const idx = newTracks.findIndex(t => t.id === track.id && t.spotifyUri === track.spotifyUri);
+             if (idx !== -1) {
+               newTracks[idx] = { ...newTracks[idx], lyrics: lyricsRows };
+             }
+             return newTracks;
+          });
+        }
+      } catch (err) {
+        if (isSubscribed) {
+           console.log(`[Spotify Lyrics] ${err.message} for ${track.title}`);
+           setTracks(prev => {
+             const newTracks = [...prev];
+             const idx = newTracks.findIndex(t => t.id === track.id && t.spotifyUri === track.spotifyUri);
+             if (idx !== -1) {
+               newTracks[idx] = { ...newTracks[idx], lyrics: [] };
+             }
+             return newTracks;
+           });
+        }
+      }
+    }
+    
+    fetchLyrics();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [currentIndex, tracks]);
 
   // --------------------------------------------------------
   // 5. Fetch user profile
