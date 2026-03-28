@@ -19,9 +19,10 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://sdk.scdn.co"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://sdk.scdn.co", "blob:"],
       connectSrc: ["'self'", "https://api.spotify.com", "wss:", "ws:"],
       frameSrc: ["'self'", "https://sdk.scdn.co", "https://accounts.spotify.com"],
+      workerSrc: ["'self'", "blob:"],
       imgSrc: ["'self'", "data:", "blob:", "https:", "*"],
       mediaSrc: ["'self'", "data:", "blob:", "https:", "*"],
     },
