@@ -4,6 +4,7 @@ import * as Tone from 'tone'
 const LocalPlayerContext = createContext(null)
 
 export function LocalPlayerProvider({ children }) {
+  const [globalTracks, setGlobalTracks] = useState([])
   const [tracks, setTracks] = useState([])
   const [currentIndex, setCurrentIndex] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -14,6 +15,7 @@ export function LocalPlayerProvider({ children }) {
   const [libraryPath, setLibraryPath] = useState('')
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false)
   const [libraryError, setLibraryError] = useState('')
+  const [activePlaylist, setActivePlaylist] = useState(null)
 
   const [audioEffects, setAudioEffects] = useState({
     eqHigh: 0,
@@ -306,7 +308,9 @@ export function LocalPlayerProvider({ children }) {
   // 6. Library Fetching & Navigation
   // --------------------------------------------------------
   const hydrateLibrary = useCallback((payload) => {
+    setActivePlaylist(null)
     const nextTracks = Array.isArray(payload?.tracks) ? payload.tracks : []
+    setGlobalTracks(nextTracks)
     setTracks(nextTracks)
     setLibraryPath(payload?.rootPath || '')
 
@@ -320,6 +324,22 @@ export function LocalPlayerProvider({ children }) {
       if (prev === null) return 0
       return Math.min(prev, nextTracks.length - 1)
     })
+  }, [])
+
+  const loadPlaylist = useCallback(async (playlist) => {
+    setActivePlaylist(playlist)
+    await ensureAudioContext()
+    const nextTracks = Array.isArray(playlist.tracks) ? playlist.tracks : []
+    setTracks(nextTracks)
+    
+    if (nextTracks.length === 0) {
+      setCurrentIndex(null)
+      setIsPlaying(false)
+      return
+    }
+
+    setCurrentIndex(0)
+    setIsPlaying(true)
   }, [])
 
   const fetchLibrary = useCallback(async (isRefresh = false) => {
@@ -363,14 +383,35 @@ export function LocalPlayerProvider({ children }) {
     setIsPlaying(true)
   }, [])
 
+  const playGlobalTrack = useCallback(async (index) => {
+    await ensureAudioContext()
+    
+    setTracks(prev => {
+      if (prev !== globalTracks) return globalTracks;
+      return prev;
+    });
+    setActivePlaylist(null);
+    
+    setCurrentIndex(index)
+    setIsPlaying(true)
+  }, [globalTracks])
+
   const playAlbum = useCallback(async (album) => {
     await ensureAudioContext()
-    const idx = tracks.findIndex(t => t.album === album)
+    
+    setTracks(prev => {
+      // If we're not already playing from globalTracks, switch back
+      if (prev !== globalTracks) return globalTracks;
+      return prev;
+    });
+    setActivePlaylist(null);
+
+    const idx = globalTracks.findIndex(t => t.album === album)
     if (idx >= 0) {
       setCurrentIndex(idx)
       setIsPlaying(true)
     }
-  }, [tracks])
+  }, [globalTracks])
 
   const togglePlay = useCallback(async () => {
     await ensureAudioContext()
@@ -408,6 +449,18 @@ export function LocalPlayerProvider({ children }) {
     }
   }, [currentIndex, tracks.length])
 
+  const handleResetDefaults = useCallback(() => {
+    setPlaybackRate(1);
+    setAudioEffects({
+      eqHigh: 0, eqMid: 0, eqLow: 0, 
+      distortion: 0, reverb: 0, vinylCrackle: 0, 
+      pitchShift: 0, chorus: 0, phaser: 0, 
+      bitCrusher: 0, delay: 0,
+      djFilter: 0, autoWah: 0, stereoWidth: 0.5, 
+      autoPan: 0, wowFlutter: 0, tapeSaturation: 0, sidechainPump: 0
+    });
+  }, []);
+
   const seek = useCallback((seconds) => {
     if (audioRef.current) {
       audioRef.current.currentTime = seconds
@@ -418,8 +471,8 @@ export function LocalPlayerProvider({ children }) {
   const albums = useMemo(() => {
     const byAlbum = new Map()
 
-    for (let i = 0; i < tracks.length; i += 1) {
-      const track = tracks[i]
+    for (let i = 0; i < globalTracks.length; i += 1) {
+      const track = globalTracks[i]
       const albumArtist = track.albumArtist || track.artist || 'Unknown Artist'
       const key = `${albumArtist}__${track.album}`
 
@@ -462,7 +515,7 @@ export function LocalPlayerProvider({ children }) {
     }
 
     return Array.from(byAlbum.values()).sort((a, b) => a.album.localeCompare(b.album))
-  }, [tracks])
+  }, [globalTracks])
 
   // --------------------------------------------------------
   // 7. Context Provider Export
@@ -471,6 +524,7 @@ export function LocalPlayerProvider({ children }) {
     audioRef,
     tracks,
     albums,
+    activePlaylist,
     currentIndex,
     currentTrack: currentIndex !== null ? tracks[currentIndex] : null,
     isPlaying,
@@ -485,7 +539,9 @@ export function LocalPlayerProvider({ children }) {
     libraryError,
     loadLibrary,
     refreshLibrary,
+    loadPlaylist,
     selectTrack,
+    playGlobalTrack,
     playAlbum,
     togglePlay,
     prevTrack,
@@ -493,13 +549,14 @@ export function LocalPlayerProvider({ children }) {
     seek,
     setVolume,
     setPlaybackRate,
+    handleResetDefaults,
     audioEffects,
     setAudioEffects,
     triggerTapeStop,
   }), [
-    tracks, albums, currentIndex, isPlaying, currentTime, duration,
+    tracks, albums, activePlaylist, currentIndex, isPlaying, currentTime, duration,
     volume, playbackRate, libraryPath, isLoadingLibrary, libraryError, audioEffects,
-    loadLibrary, refreshLibrary, selectTrack, playAlbum, togglePlay, prevTrack, nextTrack, seek, triggerTapeStop
+    loadLibrary, refreshLibrary, loadPlaylist, selectTrack, playGlobalTrack, playAlbum, togglePlay, prevTrack, nextTrack, handleResetDefaults, seek, triggerTapeStop
   ])
 
   return (

@@ -19,7 +19,7 @@ function getCookie(name) {
 }
 
 export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
-  const { selectTrack } = useLocalPlayer()
+  const { playGlobalTrack, selectTrack } = useLocalPlayer()
   const [comboMode, setComboMode] = useState('grid')
   const enableTextures = getCookie('enableAlbumTextures') !== 'false'
   const [comboCarouselIndex, setComboCarouselIndex] = useState(0)
@@ -445,7 +445,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
                         onClick={(e) => {
                           e.stopPropagation()
                           if (track.index !== undefined) {
-                            selectTrack(track.index)
+                            playGlobalTrack(track.index)
                           } else if (onPlayAlbum) {
                             onPlayAlbum(album.album)
                           }

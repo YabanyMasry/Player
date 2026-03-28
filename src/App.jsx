@@ -3,12 +3,14 @@ import { useLocalPlayer } from './state/LocalPlayerContext'
 import StudioNav from './components/StudioNav'
 import AlbumsPage from './pages/AlbumsPage'
 import VinylPlayerPage from './pages/VinylPlayerPage'
+import PlaylistsPage from './pages/PlaylistsPage'
 import SettingsPage from './pages/SettingsPage'
 import playerLogo from './assets/logo.svg'
 import './App.css'
 
 const navItems = [
   { href: '/albums', label: 'Albums' },
+  { href: '/playlists', label: 'Playlists' },
   { href: '/vinyl-player', label: 'Vinyl' },
   { href: '/settings', label: 'Settings' },
 ]
@@ -28,6 +30,7 @@ export default function App() {
   <Routes>
     <Route path="/" element={<Navigate to="/albums" replace />} />
     <Route path="/albums" element={<AlbumsPage />} />
+    <Route path="/playlists" element={<PlaylistsPage />} />
     <Route path="/vinyl-player" element={<VinylPlayerPage />} />
     <Route path="/settings" element={<SettingsPage />} />
   </Routes>

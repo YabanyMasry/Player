@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocalPlayer } from '../state/LocalPlayerContext';
-import './SettingsPage.css';
+import './SettingsPage.css'; // Don't forget to import the CSS!
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -43,14 +43,37 @@ const RetroFader = ({ label, value, min, max, step, onChange, unit = "", highlig
 
 export default function SettingsPage() {
   const [texturesEnabled, setTexturesEnabled] = useState(true);
+  const [spotifyUser, setSpotifyUser] = useState(null);
   
-  const { audioEffects, setAudioEffects, playbackRate, setPlaybackRate } = useLocalPlayer();
+  const { audioEffects, setAudioEffects, playbackRate, setPlaybackRate, handleResetDefaults } = useLocalPlayer();
+
+  // Helpers for Displays
+  const getStereoLabel = (val) => {
+    if (val === 0) return "TRUE MONO";
+    if (val === 0.5) return "NORM";
+    if (val > 0.95) return "ULTRA WIDE";
+    return `${Math.round(val * 200)}%`;
+  };
+
+  const getFilterLabel = (val) => {
+    if (val === 0) return "BYPASS";
+    if (val < 0) return `LO-PASS ${Math.round(Math.abs(val) * 100)}%`;
+    return `HI-PASS ${Math.round(val * 100)}%`;
+  };
 
   useEffect(() => {
     const cookieVal = getCookie('enableAlbumTextures');
     if (cookieVal === 'false') {
       setTexturesEnabled(false);
     }
+
+    fetch('/api/auth/me')
+      .then(res => {
+        if (!res.ok) throw new Error('Not connected');
+        return res.json();
+      })
+      .then(data => setSpotifyUser(data))
+      .catch(err => console.log("Spotify profile fetch skipped/failed:", err.message));
   }, []);
 
   const handleToggle = (e) => {
@@ -62,33 +85,6 @@ export default function SettingsPage() {
 
   const handleEffectChange = (key, value) => {
     setAudioEffects(prev => ({ ...prev, [key]: parseFloat(value) }));
-  };
-
-  const handleResetDefaults = () => {
-    setPlaybackRate(1);
-    setAudioEffects({
-      eqHigh: 0, eqMid: 0, eqLow: 0, 
-      distortion: 0, reverb: 0, vinylCrackle: 0, 
-      pitchShift: 0, chorus: 0, phaser: 0, 
-      bitCrusher: 0, delay: 0,
-      djFilter: 0, autoWah: 0, stereoWidth: 0.5, 
-      autoPan: 0, wowFlutter: 0, tapeSaturation: 0, sidechainPump: 0
-    });
-  };
-
-  // Helper for Stereo Width Display
-  const getStereoLabel = (val) => {
-    if (val === 0) return "TRUE MONO";
-    if (val === 0.5) return "NORM";
-    if (val > 0.95) return "ULTRA WIDE";
-    return `${Math.round(val * 200)}%`;
-  };
-
-  // Helper for DJ Filter Display
-  const getFilterLabel = (val) => {
-    if (val === 0) return "BYPASS";
-    if (val < 0) return `LO-PASS ${Math.round(Math.abs(val) * 100)}%`;
-    return `HI-PASS ${Math.round(val * 100)}%`;
   };
 
   return (
@@ -119,6 +115,7 @@ export default function SettingsPage() {
           Reset to Analog Defaults
         </button>
       </div>
+
       
       {/* 1. Visual Settings Rack */}
       <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
@@ -275,6 +272,47 @@ export default function SettingsPage() {
             />
           </div>
         </div>
+      </div>
+
+      {/* 5. Spotify Integration */}
+      <div className="settings-rack-panel" style={{ padding: '30px' }}>
+        <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Spotify Account Integration
+        </h2>
+        
+        {spotifyUser ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', background: '#111', padding: '20px', borderRadius: '8px', border: '1px solid #222' }}>
+            <img 
+              src={spotifyUser.images?.[0]?.url || 'https://via.placeholder.com/64?text=S'} 
+              alt="Spotify Avatar" 
+              style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover' }}
+            />
+            <div>
+              <p style={{ margin: '0 0 5px 0', color: '#1db954', fontWeight: 'bold', fontSize: '1.1rem' }}>Authenticated</p>
+              <h3 style={{ margin: 0, color: '#fff' }}>{spotifyUser.display_name}</h3>
+              <p style={{ margin: '5px 0 0 0', color: '#888', fontSize: '0.9rem' }}>Followers: {spotifyUser.followers?.total || 0}</p>
+            </div>
+            <div style={{ flex: 1, textAlign: 'right' }}>
+              <button 
+                type="button"
+                onClick={() => window.open(spotifyUser.external_urls?.spotify, '_blank')}
+                style={{ background: 'linear-gradient(145deg, #1ed760, #1db954)', color: '#000', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                View Profile
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: '#111', padding: '20px', borderRadius: '8px', border: '1px solid #222', textAlign: 'center' }}>
+            <p style={{ color: '#888', marginBottom: '16px' }}>Not connected to Spotify or authentication token expired.</p>
+            <a 
+              href="/api/auth/login" 
+              style={{ display: 'inline-block', background: 'linear-gradient(145deg, #1ed760, #1db954)', color: '#000', textDecoration: 'none', padding: '10px 24px', borderRadius: '24px', fontWeight: 'bold' }}
+            >
+              Connect Spotify
+            </a>
+          </div>
+        )}
       </div>
 
     </div>

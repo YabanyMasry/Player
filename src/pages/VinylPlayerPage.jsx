@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useLocalPlayer } from '../state/LocalPlayerContext'
 import { usePlayerScale } from '../hooks/usePlayerScale' // Adjust path as needed
 import VinylPlayer from '../components/VinylPlayer'
@@ -11,6 +11,7 @@ export default function VinylPlayerPage() {
   const {
     albums,
     tracks,
+    activePlaylist,
     currentTrack,
     currentIndex,
     isPlaying,
@@ -31,6 +32,7 @@ export default function VinylPlayerPage() {
     playAlbum,
     audioEffects,
     setAudioEffects,
+    handleResetDefaults,
   } = useLocalPlayer()
 
   // 1. Define the hardcoded CSS dimensions of your VinylPlayer
@@ -46,12 +48,13 @@ export default function VinylPlayerPage() {
 
   /* ── current album info ────────────────────────────────────── */
 
-  const currentAlbum = albums.find(a =>
-    a.tracks.some(t => t.index === currentIndex)
-  )
+  const currentAlbum = useMemo(() => {
+    if (!currentTrack) return null;
+    return albums.find(a => a.album === currentTrack.album && a.artist === (currentTrack.albumArtist || currentTrack.artist || 'Unknown Artist')) || null;
+  }, [albums, currentTrack]);
 
   const relativeTrackNum = currentAlbum && currentTrack
-    ? currentAlbum.tracks.findIndex(t => t.id === currentTrack.id) + 1
+    ? currentAlbum.tracks.findIndex(t => t.id === currentTrack.id || t.filename === currentTrack.filename) + 1
     : 1
 
   /* ── progress ──────────────────────────────────────────────── */
@@ -109,6 +112,7 @@ export default function VinylPlayerPage() {
               onPlaybackRateChange={setPlaybackRate}
               audioEffects={audioEffects}
               onEffectChange={handleEffectChange}
+              onResetDefaults={handleResetDefaults}
               onPrevAlbum={onPrevAlbum}
               onNextAlbum={onNextAlbum}
               onTogglePlay={togglePlay}
@@ -119,8 +123,28 @@ export default function VinylPlayerPage() {
           </div>
         </div>
 
-        {/* ── right tracklist (Leaves this untouched) ── */}
-        {currentAlbum && (
+        {/* ── right tracklist (conditional rendering based on playlist vs album) ── */}
+        {activePlaylist ? (
+          <aside className="vp-tracklist-panel">
+            <h3>{activePlaylist.name.toUpperCase()}</h3>
+            <p>PLAYLIST • {tracks.length} TRACKS</p>
+            <ul className="vp-tracklist">
+              {tracks.map((track, i) => {
+                const isActive = currentIndex === i
+                return (
+                  <li
+                    key={track.id || i}
+                    className={`vp-track-item ${isActive ? 'vp-track-item--active' : ''}`}
+                    onClick={() => selectTrack(i)}
+                  >
+                    <span className="vp-track-num">{i + 1}</span>
+                    <span className="vp-track-name">{track.title || track.filename || 'Unknown Track'}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          </aside>
+        ) : currentAlbum ? (
           <aside className="vp-tracklist-panel">
             <h3>{currentAlbum.album}</h3>
             <p>{currentAlbum.artist}</p>
@@ -140,7 +164,7 @@ export default function VinylPlayerPage() {
               })}
             </ul>
           </aside>
-        )}
+        ) : null}
       </div>
 
       <StudioFooter

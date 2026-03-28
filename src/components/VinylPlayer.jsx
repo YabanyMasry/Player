@@ -126,8 +126,9 @@ const StatusPulse = ({ isPlaying }) => {
   );
 };
 
-export default function VinylPlayer({ isPlaying, coverUrl, className = '', audioElement, trackNumber = 1, songName = '', albumName = '', volume = 0.8, onVolumeChange, playbackRate = 1, onPlaybackRateChange, audioEffects = {}, onEffectChange, onPrevAlbum, onNextAlbum, onTogglePlay, lyrics = [], currentTime = 0, onSeek }) {
+export default function VinylPlayer({ isPlaying, coverUrl, className = '', audioElement, trackNumber = 1, songName = '', albumName = '', volume = 0.8, onVolumeChange, playbackRate = 1, onPlaybackRateChange, audioEffects = {}, onEffectChange, onResetDefaults, onPrevAlbum, onNextAlbum, onTogglePlay, lyrics = [], currentTime = 0, onSeek }) {
   const [showLyrics, setShowLyrics] = useState(false);
+  const [showSecondary, setShowSecondary] = useState(false);
   const lyricsContainerRef = useRef(null);
 
   const vinylColor = useMemo(() => {
@@ -292,15 +293,7 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
       <div className="vp-digital-displays">
         {/* Unified Album Navigation Control (Top) */}
         <div style={{ display: 'flex', gap: '18px', marginBottom: '0px', marginRight: '55px', justifyContent: 'center', position: 'relative', zIndex: 50 }}>
-          <button
-            className="vp-retro-btn"
-            onClick={(e) => { e.stopPropagation(); onPrevAlbum?.(); }}
-            title="Previous Album"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-          </button>
+
 
           <button
             className="vp-retro-btn"
@@ -313,25 +306,41 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
             </svg>
           </button>
 
-          <button
-            className="vp-retro-btn"
-            onClick={(e) => { e.stopPropagation(); onNextAlbum?.(); }}
-            title="Next Album"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </button>
 
           <button
             className="vp-retro-btn"
             style={{ color: showLyrics ? '#fff' : '' }}
-            onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); }}
+            onClick={(e) => { e.stopPropagation(); setShowLyrics(!showLyrics); setShowSecondary(false); }}
             title="Toggle Lyrics"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </button>
+
+          <button
+            className="vp-retro-btn"
+            style={{ color: showSecondary ? '#fff' : '' }}
+            onClick={(e) => { e.stopPropagation(); setShowSecondary(!showSecondary); setShowLyrics(false); }}
+            title="Toggle Secondary Panel"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+          </button>
+
+          <button
+            className="vp-retro-btn"
+            onClick={(e) => { e.stopPropagation(); onResetDefaults?.(); }}
+            style={{ color: '#888' }}
+            title="Reset Analogue"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
             </svg>
           </button>
         </div>
@@ -379,13 +388,13 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
 
 
           {/* Right Column: Switching Control/Display Area */}
-          <div style={{ width: '260px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ width: '260px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {showLyrics ? (
               <div
                 ref={lyricsContainerRef}
                 className="vp-digital-panel vp-lyrics-container"
                 style={{
-                  padding: '45px 20px', width: '100%', height: '100%', boxSizing: 'border-box',
+                  padding: '45px 20px', width: '100%', height: '470px', boxSizing: 'border-box',
                   display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto'
                 }}
               >
@@ -403,7 +412,7 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
                           fontFamily: "'Doto', sans-serif",
                           fontWeight: isCurrent ? 600 : 400,
                           letterSpacing: '0.01em',
-                          transition: 'color 0.4s ease, font-weight 0.4s ease', // Stripped heavy transitions for extreme smoothness
+                          transition: 'color 0.4s ease, font-weight 0.4s ease', 
                           cursor: 'pointer',
                           textAlign: 'center',
                           padding: '12px 0'
@@ -416,6 +425,16 @@ export default function VinylPlayer({ isPlaying, coverUrl, className = '', audio
                 ) : (
                   <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '14px', fontFamily: "'Doto', sans-serif", textAlign: 'center', padding: '20px' }}>No lyrics found.</div>
                 )}
+              </div>
+            ) : showSecondary ? (
+              <div
+                className="vp-digital-panel"
+                style={{
+                  padding: '45px 20px', width: '100%', height: '470px', boxSizing: 'border-box',
+                  display: 'flex', flexDirection: 'column', gap: '16px'
+                }}
+              >
+                {/* Empty for now as requested */}
               </div>
             ) : (
               <>

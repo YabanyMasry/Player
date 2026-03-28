@@ -1,15 +1,44 @@
+import * as dotenv from 'dotenv'
+dotenv.config()
+
 import cors from 'cors'
 import express from 'express'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import stringSimilarity from 'string-similarity' 
+import spotifyRouter, { initSpotify, getSpotifyPlaylistTracks } from './spotify.js'
 
 const app = express()
 const PORT = Number(process.env.PORT || 4174)
 
-// Update this path to your albums root folder.
-// Example structure:
-// D:\Music\Albums\Album Title - Album Artist\01 - Artist - Song.mp3
-const ALBUMS_ROOT = process.env.ALBUMS_ROOT || String.raw`D:\Music\Albums`
+// --- SECURITY MIDDLEWARE ---
+// Helmet for basic HTTP header protection
+app.use(helmet({
+  crossOriginResourcePolicy: false, // Required so audio elements can load sources
+}))
+app.use(cors())
+app.use(express.json())
+
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+app.use('/api', apiLimiter)
+
+// --- LOCAL MUSIC PATH CONFIGURATION ---
+const ALBUMS_ROOT = process.env.ALBUMS_ROOT;
+const PLAYLISTS_ROOT = process.env.PLAYLISTS_ROOT || (ALBUMS_ROOT ? path.join(ALBUMS_ROOT, '..', 'Playlists') : '');
+
+if (!ALBUMS_ROOT) {
+  console.error('\x1b[31m%s\x1b[0m', '❌ CRITICAL ERROR: ALBUMS_ROOT is not defined in .env! Cannot start the server.');
+  process.exit(1);
+}
 
 const AUDIO_EXT_RE = /\.(mp3|m4a|aac|wav|flac|ogg|opus|wma)$/i
 const COVER_RE = /^cover\.(jpg|jpeg|png|webp)$/i
@@ -22,77 +51,41 @@ let cachedLibrary = {
   tracks: [],
 }
 
-app.use(cors())
-
-function toPosix(filePath) {
-  return filePath.split(path.sep).join('/')
-}
-
-function stripExtension(filename) {
-  return String(filename || '').replace(/\.[^/.]+$/, '')
-}
+// --- UTILS ---
+function toPosix(filePath) { return filePath.split(path.sep).join('/') }
+function stripExtension(filename) { return String(filename || '').replace(/\.[^/.]+$/, '') }
 
 function parseAlbumFolderName(folderName) {
-  const fallback = {
-    albumTitle: folderName || 'Unknown Album',
-    albumArtist: 'Unknown Artist',
-  }
-
-  if (!folderName || !folderName.includes(' - ')) {
-    return fallback
-  }
-
+  const fallback = { albumTitle: folderName || 'Unknown Album', albumArtist: 'Unknown Artist' }
+  if (!folderName || !folderName.includes(' - ')) return fallback
   const parts = folderName.split(' - ').map(p => p.trim()).filter(Boolean)
-  if (parts.length < 2) {
-    return fallback
-  }
-
-  return {
-    albumTitle: parts.slice(0, -1).join(' - '),
-    albumArtist: parts[parts.length - 1],
-  }
+  if (parts.length < 2) return fallback
+  return { albumTitle: parts.slice(0, -1).join(' - '), albumArtist: parts[parts.length - 1] }
 }
 
 function parseTrackFileName(filename) {
   const base = stripExtension(filename)
   const match = base.match(/^(\d+)\s*-\s*(.+?)\s*-\s*(.+)$/)
-
-  if (match) {
-    return {
-      trackNumber: Number.parseInt(match[1], 10),
-      artist: match[2].trim(),
-      title: match[3].trim(),
-    }
-  }
-
-  return {
-    trackNumber: Number.MAX_SAFE_INTEGER,
-    artist: 'Unknown Artist',
-    title: base,
-  }
+  if (match) return { trackNumber: Number.parseInt(match[1], 10), artist: match[2].trim(), title: match[3].trim() }
+  return { trackNumber: Number.MAX_SAFE_INTEGER, artist: 'Unknown Artist', title: base }
 }
 
 function parseLrcText(text) {
   const rows = []
   const lines = String(text || '').split(/\r?\n/)
-
   for (const line of lines) {
     const timestamps = [...line.matchAll(/\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g)]
     if (!timestamps.length) continue
-
     const lyricText = line.replace(/\[[^\]]+\]/g, '').trim()
-
     for (const stamp of timestamps) {
       const min = Number.parseInt(stamp[1], 10)
       const sec = Number.parseInt(stamp[2], 10)
       const fractionRaw = stamp[3] ?? '0'
       const fraction = Number.parseInt(fractionRaw.padEnd(3, '0').slice(0, 3), 10)
       const time = min * 60 + sec + fraction / 1000
-
       rows.push({ time, text: lyricText || '...' })
     }
   }
-
   rows.sort((a, b) => a.time - b.time)
   return rows
 }
@@ -100,18 +93,14 @@ function parseLrcText(text) {
 function parseM3uOrder(content) {
   const orderMap = new Map()
   const lines = String(content || '').split(/\r?\n/)
-
   for (const raw of lines) {
     const line = raw.trim().replace(/^['"]|['"]$/g, '')
     if (!line || line.startsWith('#')) continue
     const parts = line.split(/[\\/]/)
     const base = (parts[parts.length - 1] || '').toLowerCase()
     if (!base) continue
-    if (!orderMap.has(base)) {
-      orderMap.set(base, orderMap.size)
-    }
+    if (!orderMap.has(base)) orderMap.set(base, orderMap.size)
   }
-
   return orderMap
 }
 
@@ -119,23 +108,14 @@ function safeResolveMediaPath(relativePath) {
   const decoded = decodeURIComponent(relativePath || '')
   const abs = path.resolve(ALBUMS_ROOT, decoded)
   const root = path.resolve(ALBUMS_ROOT)
-
-  if (!abs.startsWith(root)) {
-    throw new Error('Invalid path')
-  }
-
+  if (!abs.startsWith(root)) throw new Error('Invalid path')
   return abs
 }
 
+// --- SCANNING ENGINE ---
 async function scanLibrary() {
-  const rootStats = await fs.stat(ALBUMS_ROOT)
-  if (!rootStats.isDirectory()) {
-    throw new Error(`ALBUMS_ROOT is not a directory: ${ALBUMS_ROOT}`)
-  }
-
   const rootEntries = await fs.readdir(ALBUMS_ROOT, { withFileTypes: true })
   const albumDirs = rootEntries.filter(e => e.isDirectory())
-
   const tracks = []
 
   for (const dir of albumDirs) {
@@ -146,9 +126,7 @@ async function scanLibrary() {
     try {
       const jsonText = await fs.readFile(path.join(albumAbsPath, `${albumFolderName}.json`), 'utf8')
       jsonMeta = JSON.parse(jsonText)
-    } catch {
-      // ignore
-    }
+    } catch { }
 
     const fallbackMeta = parseAlbumFolderName(albumFolderName)
     const albumTitle = jsonMeta?.playlist?.title || fallbackMeta.albumTitle
@@ -159,15 +137,8 @@ async function scanLibrary() {
       const entries = await fs.readdir(currentDir, { withFileTypes: true })
       for (const entry of entries) {
         const fullPath = path.join(currentDir, entry.name)
-        if (entry.isDirectory()) {
-          await walk(fullPath)
-        } else {
-          allFiles.push({
-            name: entry.name,
-            fullPath,
-            dirName: path.basename(currentDir),
-          })
-        }
+        if (entry.isDirectory()) await walk(fullPath)
+        else allFiles.push({ name: entry.name, fullPath, dirName: path.basename(currentDir) })
       }
     }
     await walk(albumAbsPath)
@@ -179,11 +150,7 @@ async function scanLibrary() {
     for (const file of allFiles) {
       const lower = file.name.toLowerCase()
       const rel = toPosix(path.relative(ALBUMS_ROOT, file.fullPath))
-
-      if (COVER_RE.test(file.name)) {
-        if (!coverRelativePath) coverRelativePath = rel
-        continue
-      }
+      if (COVER_RE.test(file.name)) { if (!coverRelativePath) coverRelativePath = rel; continue; }
       if (PLAYLIST_EXT_RE.test(lower)) {
         try {
           const m3uText = await fs.readFile(file.fullPath, 'utf8')
@@ -201,18 +168,13 @@ async function scanLibrary() {
     }
 
     const audioFiles = allFiles.filter(f => AUDIO_EXT_RE.test(f.name))
-
     const parsedAlbumTracks = audioFiles.map((file) => {
       const fileName = file.name
       const relativePath = toPosix(path.relative(ALBUMS_ROOT, file.fullPath))
       const basenm = stripExtension(fileName)
-
       let discNumber = 1
       const discMatch = file.dirName.match(/Disc\s*(\d+)/i)
-      if (discMatch) {
-        discNumber = Number.parseInt(discMatch[1], 10)
-      }
-
+      if (discMatch) discNumber = Number.parseInt(discMatch[1], 10)
       let jsonTrack = null
       if (jsonMeta && Array.isArray(jsonMeta.tracks)) {
         const match = basenm.match(/^(\d+)/)
@@ -221,22 +183,14 @@ async function scanLibrary() {
           jsonTrack = jsonMeta.tracks.find(t => t.position === pos || t.trackNumber === pos)
         }
       }
-
       const trackMeta = parseTrackFileName(fileName)
       const playlistOrder = playlistOrderMap.get(fileName.toLowerCase())
-
       const finalArtist = jsonTrack?.artist || trackMeta.artist || albumArtist
       const finalTitle = jsonTrack?.title || trackMeta.title
 
       return {
-        id: relativePath,
-        album: albumTitle,
-        albumArtist: albumArtist,
-        artist: finalArtist,
-        title: finalTitle,
-        filename: fileName,
-        relativePath,
-        discNumber,
+        id: relativePath, album: albumTitle, albumArtist, artist: finalArtist, title: finalTitle,
+        filename: fileName, relativePath, absolutePath: file.fullPath, discNumber,
         trackNumber: jsonTrack?.trackNumber ?? (Number.isFinite(trackMeta.trackNumber) ? trackMeta.trackNumber : Number.MAX_SAFE_INTEGER),
         coverUrl: coverRelativePath ? `/media/${coverRelativePath.split('/').map(encodeURIComponent).join('/')}` : null,
         lyrics: lyricsByBase.get(basenm.toLowerCase()) || [],
@@ -245,81 +199,130 @@ async function scanLibrary() {
       }
     })
 
-    parsedAlbumTracks.sort((a, b) => {
-      if (a.discNumber !== b.discNumber) return a.discNumber - b.discNumber
-      if (a.orderKey !== b.orderKey) return a.orderKey - b.orderKey
-      return a.filename.localeCompare(b.filename)
-    })
-
     for (const t of parsedAlbumTracks) {
-      tracks.push({
-        ...t,
-        url: `/media/${t.relativePath.split('/').map(encodeURIComponent).join('/')}`,
-      })
+      tracks.push({ ...t, url: `/media/${t.relativePath.split('/').map(encodeURIComponent).join('/')}` })
     }
   }
-
-  tracks.sort((a, b) => {
-    const artistCmp = a.albumArtist.localeCompare(b.albumArtist)
-    if (artistCmp !== 0) return artistCmp
-
-    const albumCmp = a.album.localeCompare(b.album)
-    if (albumCmp !== 0) return albumCmp
-
-    if (a.discNumber !== b.discNumber) return a.discNumber - b.discNumber
-    if (a.orderKey !== b.orderKey) return a.orderKey - b.orderKey
-
-    return a.filename.localeCompare(b.filename)
-  })
-
-  cachedLibrary = {
-    rootPath: ALBUMS_ROOT,
-    scannedAt: new Date().toISOString(),
-    tracks,
-  }
+  cachedLibrary = { rootPath: ALBUMS_ROOT, scannedAt: new Date().toISOString(), tracks }
 }
 
-app.get('/api/library', async (_req, res) => {
-  try {
-    if (!cachedLibrary.scannedAt) {
-      await scanLibrary()
+// --- SYNC ENGINE ---
+function matchTracksToLocalLibrary(spotifyTracks, localTracks) {
+  console.log(`[Sync] Starting fuzzy match for ${spotifyTracks.length} tracks...`);
+  const localTrackStrings = localTracks.map(t => `${t.artist} ${t.title}`.toLowerCase());
+  const matchedPaths = [];
+  const notFound = [];
+
+  for (const sTrack of spotifyTracks) {
+    const searchString = `${sTrack.artist} ${sTrack.title}`.toLowerCase();
+    if (localTrackStrings.length === 0) { notFound.push(sTrack); continue; }
+    const match = stringSimilarity.findBestMatch(searchString, localTrackStrings);
+    if (match.bestMatch.rating > 0.65) {
+      matchedPaths.push(localTracks[match.bestMatchIndex].absolutePath);
+    } else {
+      notFound.push(sTrack);
     }
-    res.json(cachedLibrary)
-  } catch (error) {
-    res.status(500).json({
-      error: 'Failed to scan library',
-      detail: String(error?.message || error),
-    })
   }
+  return { matchedPaths, notFound };
+}
+
+// --- ROUTES ---
+app.use('/api/auth', spotifyRouter);
+
+app.post('/api/playlists/import-spotify', async (req, res) => {
+  try {
+    const { spotifyUrl } = req.body;
+    let playlistId = null;
+    if (spotifyUrl.includes('playlist/')) playlistId = spotifyUrl.split('playlist/')[1].split('?')[0].split('/')[0];
+    else if (spotifyUrl.startsWith('spotify:playlist:')) playlistId = spotifyUrl.split(':')[2];
+
+    if (!playlistId) return res.status(400).json({ error: 'Invalid Spotify Playlist URL format.' });
+    if (!cachedLibrary.scannedAt) await scanLibrary();
+
+    const { playlistName, tracks: spotifyTracks } = await getSpotifyPlaylistTracks(playlistId);
+    const { matchedPaths, notFound } = matchTracksToLocalLibrary(spotifyTracks, cachedLibrary.tracks);
+
+    const m3u8Content = "#EXTM3U\n" + matchedPaths.map(p => toPosix(p)).join('\n');
+    const safeFileName = playlistName.replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+    const playlistFilePath = path.join(PLAYLISTS_ROOT, `${safeFileName}.m3u8`);
+
+    await fs.mkdir(PLAYLISTS_ROOT, { recursive: true });
+    await fs.writeFile(playlistFilePath, m3u8Content, 'utf8');
+
+    res.json({ success: true, playlistName: safeFileName, matchedCount: matchedPaths.length, totalCount: spotifyTracks.length, missingTracks: notFound });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/playlists', async (req, res) => {
+  try {
+    const entries = await fs.readdir(PLAYLISTS_ROOT, { withFileTypes: true });
+    const playlists = entries
+      .filter(e => e.isFile() && PLAYLIST_EXT_RE.test(e.name))
+      .map(e => ({ name: stripExtension(e.name), filename: e.name }));
+    res.json(playlists);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/playlists/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const absPath = path.join(PLAYLISTS_ROOT, filename);
+    const content = await fs.readFile(absPath, 'utf8');
+    const lines = content.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+
+    if (!cachedLibrary.scannedAt) await scanLibrary();
+
+    const playlistTracks = lines.map(line => {
+      // The line is the toPosix(t.absolutePath)
+      return cachedLibrary.tracks.find(t => toPosix(t.absolutePath) === line);
+    }).filter(Boolean);
+
+    res.json({ name: stripExtension(filename), tracks: playlistTracks });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/library', async (_req, res) => {
+  if (!cachedLibrary.scannedAt) await scanLibrary()
+  res.json(cachedLibrary)
 })
 
 app.post('/api/library/refresh', async (_req, res) => {
-  try {
-    await scanLibrary()
-    res.json(cachedLibrary)
-  } catch (error) {
-    res.status(500).json({
-      error: 'Failed to refresh library',
-      detail: String(error?.message || error),
-    })
-  }
+  await scanLibrary()
+  res.json(cachedLibrary)
 })
 
 app.get('/media/*', async (req, res) => {
   try {
-    const relativePath = req.params[0]
-    const filePath = safeResolveMediaPath(relativePath)
+    const filePath = safeResolveMediaPath(req.params[0])
     res.sendFile(filePath)
   } catch {
     res.status(404).json({ error: 'Media file not found' })
   }
 })
 
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, rootPath: ALBUMS_ROOT })
-})
+// --- STATIC FRONTEND SERVING (PRODUCTION ONLY) ---
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  app.use(express.static(distPath));
 
-app.listen(PORT, () => {
+  app.get('*', (req, res) => {
+    // Prevent the wildcard from breaking API or media routes if they weren't caught
+    if (req.path.startsWith('/api') || req.path.startsWith('/media')) return res.status(404).json({ error: 'Endpoint not found' });
+    
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
+app.listen(PORT, async () => {
   console.log(`[library-server] http://localhost:${PORT}`)
-  console.log(`[library-server] ALBUMS_ROOT=${ALBUMS_ROOT}`)
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`[production] Serving frontend directly from /dist`);
+  }
+  await initSpotify(ALBUMS_ROOT, PLAYLISTS_ROOT, PORT);
 })
