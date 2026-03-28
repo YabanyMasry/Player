@@ -307,8 +307,10 @@ app.get('/media/*', async (req, res) => {
 })
 
 // --- STATIC FRONTEND SERVING (PRODUCTION ONLY) ---
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(process.cwd(), 'dist');
+import fsSync from 'node:fs';
+const distPath = path.join(process.cwd(), 'dist');
+
+if (process.env.NODE_ENV === 'production' || fsSync.existsSync(distPath)) {
   app.use(express.static(distPath));
 
   app.get('*', (req, res) => {
