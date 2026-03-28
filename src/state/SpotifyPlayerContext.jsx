@@ -339,7 +339,7 @@ export function SpotifyPlayerProvider({ children }) {
       // Spotify playlist — fetch tracks from API
       const id = playlist.spotifyUri.split(':').pop()
       try {
-        const res = await fetch(`/api/auth/spotify/playlists/${id}/tracks?limit=100`)
+        const res = await fetch(`/api/auth/spotify/playlists/${id}/items?limit=100`)
         if (!res.ok) throw new Error('Failed to fetch playlist tracks')
         const data = await res.json()
 

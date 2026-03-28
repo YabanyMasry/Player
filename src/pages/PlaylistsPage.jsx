@@ -57,7 +57,7 @@ export default function PlaylistsPage() {
     try {
       if (mode === 'spotify' && playlist.spotifyUri) {
         const id = playlist.spotifyUri.split(':').pop();
-        const response = await fetch(`/api/auth/spotify/playlists/${id}/tracks?limit=100`);
+        const response = await fetch(`/api/auth/spotify/playlists/${id}/items?limit=100`);
         if (!response.ok) throw new Error('Failed to load Spotify playlist tracks');
         const data = await response.json();
         const tracks = (data.items || [])

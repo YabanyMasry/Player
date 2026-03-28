@@ -406,7 +406,7 @@ router.get('/spotify/playlists', (req, res) => {
   spotifyProxy(req, res, `/me/playlists?limit=${limit}&offset=${offset}`);
 });
 
-router.get('/spotify/playlists/:id/tracks', (req, res) => {
+router.get('/spotify/playlists/:id/items', (req, res) => {
   const limit = req.query.limit || 100;
   const offset = req.query.offset || 0;
   spotifyProxy(req, res, `/playlists/${req.params.id}/items?limit=${limit}&offset=${offset}&additional_types=track`);
