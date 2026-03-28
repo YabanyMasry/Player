@@ -14,9 +14,18 @@ const app = express()
 const PORT = Number(process.env.PORT || 4174)
 
 // --- SECURITY MIDDLEWARE ---
-// Helmet for basic HTTP header protection
 app.use(helmet({
   crossOriginResourcePolicy: false, // Required so audio elements can load sources
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://sdk.scdn.co"],
+      connectSrc: ["'self'", "https://api.spotify.com", "wss:", "ws:"],
+      frameSrc: ["'self'", "https://sdk.scdn.co", "https://accounts.spotify.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:", "*"],
+      mediaSrc: ["'self'", "data:", "blob:", "https:", "*"],
+    },
+  },
 }))
 app.use(cors())
 app.use(express.json())
