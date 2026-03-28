@@ -11,6 +11,7 @@ import stringSimilarity from 'string-similarity'
 import spotifyRouter, { initSpotify, getSpotifyPlaylistTracks } from './spotify.js'
 
 const app = express()
+app.set('trust proxy', 1) // Required for Railway/reverse proxies to accurately process express-rate-limit IP addresses
 const PORT = Number(process.env.PORT || 4174)
 
 // --- SECURITY MIDDLEWARE ---
