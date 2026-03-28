@@ -2,8 +2,8 @@
 
 .vp-turntable {
   position: relative;
-  width: min(1050px, 95vw);
-  height: min(700px, 65vh);
+  width: 1048px;
+  height: 618px;
   flex-shrink: 0;
   background: var(--surface, #1b1b1b);
   border-radius: 12px;
@@ -90,8 +90,8 @@
   left: 50px;
   top: 50%;
   transform: translateY(-50%);
-  width: min(625px, 60vh);
-  height: min(625px, 60vh);
+  width: 572px;
+  height: 572px;
   border-radius: 50%;
   background: #111;
   display: flex;
@@ -192,8 +192,6 @@
 .vp-tonearm-joint--end {
   top: 250px;
 }
-
-/* ── tonearm matching sketch ────────────────────────────────────── */
 
 /* ── tonearm matching sketch ────────────────────────────────────── */
 
