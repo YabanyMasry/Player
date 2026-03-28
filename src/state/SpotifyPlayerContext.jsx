@@ -66,17 +66,24 @@ export function SpotifyPlayerProvider({ children }) {
   // 2. Load Web Playback SDK
   // --------------------------------------------------------
   useEffect(() => {
-    // Don't load if SDK script already exists
-    if (document.querySelector(`script[src="${SPOTIFY_SDK_URL}"]`)) return
+    // If SDK already loaded (cached/fast load), mark ready immediately
+    if (window.Spotify?.Player) {
+      setIsSDKReady(true)
+      return
+    }
 
+    // Always (re-)register the callback — the SDK checks for this global
     window.onSpotifyWebPlaybackSDKReady = () => {
       setIsSDKReady(true)
     }
 
-    const script = document.createElement('script')
-    script.src = SPOTIFY_SDK_URL
-    script.async = true
-    document.body.appendChild(script)
+    // Only inject the script tag once
+    if (!document.querySelector(`script[src="${SPOTIFY_SDK_URL}"]`)) {
+      const script = document.createElement('script')
+      script.src = SPOTIFY_SDK_URL
+      script.async = true
+      document.body.appendChild(script)
+    }
 
     return () => {
       delete window.onSpotifyWebPlaybackSDKReady
@@ -222,33 +229,44 @@ export function SpotifyPlayerProvider({ children }) {
     setLibraryError('')
 
     try {
-      // Fetch saved albums
-      const albumsRes = await fetch('/api/auth/spotify/albums?limit=50')
-      if (!albumsRes.ok) throw new Error('Failed to fetch Spotify albums')
-      const albumsData = await albumsRes.json()
-
       const allTracks = []
-      const items = albumsData.items || []
+      let offset = 0
+      const limit = 50
+      let total = Infinity
 
-      for (const item of items) {
-        const album = item.album
-        if (!album) continue
+      // Fetch saved albums page by page
+      while (offset < total) {
+        const albumsRes = await fetch(`/api/auth/spotify/albums?limit=${limit}&offset=${offset}`)
+        if (!albumsRes.ok) throw new Error('Failed to fetch Spotify albums')
+        const albumsData = await albumsRes.json()
 
-        for (const track of (album.tracks?.items || [])) {
-          allTracks.push({
-            id: track.id,
-            title: track.name,
-            artist: track.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
-            album: album.name,
-            albumArtist: album.artists?.[0]?.name || 'Unknown Artist',
-            coverUrl: album.images?.[0]?.url || null,
-            trackNumber: track.track_number,
-            discNumber: track.disc_number,
-            spotifyUri: track.uri,
-            albumUri: album.uri,
-            filename: track.name, // compat
-          })
+        total = albumsData.total || 0
+        const items = albumsData.items || []
+        
+        if (items.length === 0) break
+
+        for (const item of items) {
+          const album = item.album
+          if (!album) continue
+
+          for (const track of (album.tracks?.items || [])) {
+            allTracks.push({
+              id: track.id,
+              title: track.name,
+              artist: track.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
+              album: album.name,
+              albumArtist: album.artists?.[0]?.name || 'Unknown Artist',
+              coverUrl: album.images?.[0]?.url || null,
+              trackNumber: track.track_number,
+              discNumber: track.disc_number,
+              spotifyUri: track.uri,
+              albumUri: album.uri,
+              filename: track.name, // compat
+            })
+          }
         }
+        
+        offset += limit;
       }
 
       setGlobalTracks(allTracks)

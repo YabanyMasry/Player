@@ -28,17 +28,32 @@ export default function PlaylistsPage() {
     setIsLoading(true);
     try {
       if (mode === 'spotify') {
-        const response = await fetch('/api/auth/spotify/playlists?limit=50');
-        if (!response.ok) throw new Error('Failed to fetch Spotify playlists');
-        const data = await response.json();
-        const items = (data.items || []).map(p => ({
-          name: p.name,
-          filename: p.id,
-          spotifyUri: p.uri,
-          imageUrl: p.images?.[0]?.url || null,
-          trackCount: p.tracks?.total || 0,
-        }));
-        setPlaylists(items);
+        let allItems = [];
+        let offset = 0;
+        const limit = 50;
+        let total = Infinity;
+
+        while (offset < total) {
+          const response = await fetch(`/api/auth/spotify/playlists?limit=${limit}&offset=${offset}`);
+          if (!response.ok) throw new Error('Failed to fetch Spotify playlists');
+          const data = await response.json();
+          
+          total = data.total || 0;
+          const items = data.items || [];
+          if (items.length === 0) break;
+
+          allItems.push(...items.map(p => ({
+            name: p.name,
+            filename: p.id,
+            spotifyUri: p.uri,
+            imageUrl: p.images?.[0]?.url || null,
+            trackCount: p.tracks?.total || 0,
+          })));
+
+          offset += limit;
+        }
+
+        setPlaylists(allItems);
       } else {
         const response = await fetch('/api/playlists');
         if (!response.ok) throw new Error('Failed to fetch playlists');

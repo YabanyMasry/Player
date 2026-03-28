@@ -416,10 +416,59 @@ router.get('/spotify/playlists', (req, res) => {
   spotifyProxy(req, res, `/me/playlists?limit=${limit}&offset=${offset}`);
 });
 
-router.get('/spotify/playlists/:id/items', (req, res) => {
+router.get('/spotify/playlists/:id/items', async (req, res) => {
+  const playlistId = req.params.id;
   const limit = req.query.limit || 100;
   const offset = req.query.offset || 0;
-  spotifyProxy(req, res, `/playlists/${req.params.id}/items?limit=${limit}&offset=${offset}&additional_types=track`);
+  
+  try {
+    // Strategy 1: Try the direct API
+    let token = await getSpotifyToken();
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+    const spotifyPath = `/playlists/${playlistId}/items?limit=${limit}&offset=${offset}&additional_types=track`;
+    let response = await fetch(`https://api.spotify.com/v1${spotifyPath}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
+        token = await getSpotifyToken(true);
+        response = await fetch(`https://api.spotify.com/v1${spotifyPath}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+    }
+
+    if (response.ok) {
+      const data = await response.json();
+      // Check if we actually got tracks
+      if (data.items && data.items.length > 0 && data.items.some(i => i?.track)) {
+        return res.json(data);
+      }
+    }
+
+    // Strategy 2: Fall back to embed extraction
+    console.log(`[Spotify Proxy] API failed or empty for playlist ${playlistId}, falling back to embed extraction...`);
+    const result = await getSpotifyPlaylistTracks(playlistId);
+    
+    // Map to the same shape the frontend expects
+    const items = (result.tracks || []).map(t => ({
+      track: {
+        id: null,
+        name: t.title,
+        uri: null,
+        artists: [{ name: t.artist }],
+        album: { name: 'Unknown Album', images: [], artists: [{ name: t.artist }] },
+        track_number: null,
+      }
+    }));
+    
+    res.json({ items, total: items.length });
+  } catch (err) {
+    console.error('[Spotify Proxy] Playlist items error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/spotify/tracks', (req, res) => {
