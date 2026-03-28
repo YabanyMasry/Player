@@ -3,8 +3,6 @@ dotenv.config()
 
 import cors from 'cors'
 import express from 'express'
-import helmet from 'helmet'
-import rateLimit from 'express-rate-limit'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import stringSimilarity from 'string-similarity' 
@@ -15,32 +13,8 @@ app.set('trust proxy', 1) // Required for Railway/reverse proxies to accurately 
 const PORT = Number(process.env.PORT || 4174)
 
 // --- SECURITY MIDDLEWARE ---
-app.use(helmet({
-  crossOriginResourcePolicy: false, // Required so audio elements can load sources
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://sdk.scdn.co", "blob:"],
-      connectSrc: ["'self'", "https://api.spotify.com", "wss:", "ws:"],
-      frameSrc: ["'self'", "https://sdk.scdn.co", "https://accounts.spotify.com"],
-      workerSrc: ["'self'", "blob:"],
-      imgSrc: ["'self'", "data:", "blob:", "https:", "*"],
-      mediaSrc: ["'self'", "data:", "blob:", "https:", "*"],
-    },
-  },
-}))
 app.use(cors())
 app.use(express.json())
-
-// Rate limiting for API endpoints
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Limit each IP to 1000 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-app.use('/api', apiLimiter)
 
 // --- LOCAL MUSIC PATH CONFIGURATION ---
 const ALBUMS_ROOT = process.env.ALBUMS_ROOT || (process.env.VITE_PLAYER_MODE === 'spotify' ? process.cwd() : '');
