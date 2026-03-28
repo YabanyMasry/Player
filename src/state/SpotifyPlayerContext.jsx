@@ -136,15 +136,19 @@ export function SpotifyPlayerProvider({ children }) {
         console.error('[Spotify SDK] Init error:', message)
         setLibraryError(`Spotify SDK init failed: ${message}`)
       })
+      let authRetries = 0
       player.addListener('authentication_error', async ({ message }) => {
-        console.warn('[Spotify SDK] Auth error:', message, '— attempting auto-refresh...')
-        // Try to get a fresh token from the server (triggers server-side refresh)
+        authRetries++
+        if (authRetries > 2) {
+          console.error('[Spotify SDK] Auth failed after retries. Scopes may be outdated — re-login required.')
+          setLibraryError('Spotify token scopes are outdated. Please logout and re-login via Settings.')
+          return
+        }
+        console.warn('[Spotify SDK] Auth error:', message, `— retry ${authRetries}/2...`)
         const freshToken = await fetchToken()
         if (freshToken) {
-          console.log('[Spotify SDK] Got fresh token, reconnecting...')
-          // The SDK will call getOAuthToken on the next connect attempt
           player.disconnect()
-          setTimeout(() => player.connect(), 1000)
+          setTimeout(() => player.connect(), 1500)
         } else {
           setLibraryError('Spotify authentication failed. Please re-login via Settings.')
         }

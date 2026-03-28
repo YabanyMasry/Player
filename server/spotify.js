@@ -38,18 +38,21 @@ export async function initSpotify(albumsRoot, playlistsRoot, port) {
   TOKENS_PATH = path.join(process.cwd(), 'spotify_tokens.json');
   await loadTokens();
 
-  // Immediately refresh if we have a refresh token (ensures fresh token on startup)
-  if (spotifyAuth.refresh_token) {
-    try {
-      await getSpotifyToken(true);
-      console.log('[Spotify] Token refreshed on startup.');
-    } catch (err) {
-      console.warn('[Spotify] Could not refresh token on startup:', err.message);
+  // Only run the startup refresh and background timer if we are in Spotify mode
+  if (process.env.VITE_PLAYER_MODE === 'spotify') {
+    // Immediately refresh if we have a refresh token (ensures fresh token on startup)
+    if (spotifyAuth.refresh_token) {
+      try {
+        await getSpotifyToken(true);
+        console.log('[Spotify] Token refreshed on startup.');
+      } catch (err) {
+        console.warn('[Spotify] Could not refresh token on startup:', err.message);
+      }
     }
-  }
 
-  // Start background auto-refresh loop
-  startAutoRefresh();
+    // Start background auto-refresh loop
+    startAutoRefresh();
+  }
 }
 
 // --- TOKEN MANAGEMENT ---
