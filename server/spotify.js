@@ -18,7 +18,6 @@ if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
 let ALBUMS_ROOT = '';
 let PLAYLISTS_ROOT = '';
 let PORT = process.env.PORT || 4174;
-let REDIRECT_URI = '';
 let TOKENS_PATH = '';
 
 let spotifyAuth = {
@@ -33,7 +32,6 @@ export function initSpotify(albumsRoot, playlistsRoot, port) {
   PORT = port;
   
   const baseUrl = process.env.BASE_URL || `http://127.0.0.1:${PORT}`;
-  REDIRECT_URI = `${baseUrl}/api/auth/callback`;
   
   TOKENS_PATH = path.join(process.cwd(), 'spotify_tokens.json');
   return loadTokens();
@@ -243,6 +241,14 @@ export async function getSpotifyPlaylistTracks(playlistId) {
 
 // --- AUTH ROUTES ---
 
+const getRedirectUri = (req) => {
+  const protocol = req.get('x-forwarded-proto') || req.protocol;
+  const host = req.get('host');
+  // Local development override to avoid mismatch if local server uses IPv4 or localhost weirdly
+  // but generally relying on req.get('host') is the best for serverless proxy deployments
+  return `${protocol}://${host}/api/auth/callback`;
+};
+
 router.get('/login', (req, res) => {
   const scope = [
     'playlist-read-private',
@@ -257,7 +263,7 @@ router.get('/login', (req, res) => {
     response_type: 'code',
     client_id: SPOTIFY_CLIENT_ID,
     scope: scope,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: getRedirectUri(req),
   }).toString();
   res.redirect(spotifyUrl);
 });
@@ -278,7 +284,7 @@ router.get('/callback', async (req, res) => {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: REDIRECT_URI
+        redirect_uri: getRedirectUri(req)
       })
     });
 
@@ -293,9 +299,10 @@ router.get('/callback', async (req, res) => {
       expires_at: Date.now() + (data.expires_in * 1000)
     };
     await saveTokens();
-    // Redirect back to the app settings page instead of showing a raw HTML page
-    const baseUrl = process.env.BASE_URL || `http://127.0.0.1:${PORT}`;
-    res.redirect(`${baseUrl}/settings`);
+    // Redirect back to the app settings page dynamically
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host');
+    res.redirect(`${protocol}://${host}/settings`);
   } catch (error) {
     res.status(500).send(`Auth Error: ${error.message}`);
   }
