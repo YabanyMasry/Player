@@ -284,6 +284,9 @@ const getRedirectUri = (req) => {
 };
 
 router.get('/login', (req, res) => {
+  const { returnTo } = req.query;
+  const state = returnTo || '/settings';
+  
   const scope = [
     'playlist-read-private',
     'playlist-read-collaborative',
@@ -300,12 +303,13 @@ router.get('/login', (req, res) => {
     client_id: SPOTIFY_CLIENT_ID,
     scope: scope,
     redirect_uri: getRedirectUri(req),
+    state: state
   }).toString();
   res.redirect(spotifyUrl);
 });
 
 router.get('/callback', async (req, res) => {
-  const { code, error } = req.query;
+  const { code, state, error } = req.query;
   if (error) return res.status(400).send(`Auth Failed: ${error}`);
   if (!code) return res.status(400).send('No code provided');
 
@@ -335,10 +339,19 @@ router.get('/callback', async (req, res) => {
       expires_at: Date.now() + (data.expires_in * 1000)
     };
     await saveTokens();
-    // Redirect back to the app settings page dynamically
+    
+    // Redirect back to the app page dynamically
     const protocol = req.get('x-forwarded-proto') || req.protocol;
-    const host = req.get('host');
-    res.redirect(`${protocol}://${host}/settings`);
+    let host = req.get('host');
+    
+    // In dev mode, if the request came to the backend port (4174), 
+    // we want to redirect back to the vite port (5173)
+    if (process.env.NODE_ENV !== 'production' && host.includes('4174')) {
+      host = host.replace('4174', '5173');
+    }
+    
+    const targetPath = state || '/settings';
+    res.redirect(`${protocol}://${host}${targetPath}`);
   } catch (error) {
     res.status(500).send(`Auth Error: ${error.message}`);
   }

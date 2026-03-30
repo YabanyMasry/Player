@@ -448,6 +448,32 @@ export function LocalPlayerProvider({ children }) {
     }
   }, [currentIndex, tracks.length])
 
+  const playNext = useCallback(async (track) => {
+    setTracks(prev => {
+      const newTracks = [...prev];
+      if (currentIndex !== null) {
+        newTracks.splice(currentIndex + 1, 0, track);
+      } else {
+        newTracks.push(track);
+      }
+      return newTracks;
+    });
+    if (currentIndex === null) {
+      await ensureAudioContext();
+      setCurrentIndex(0);
+      setIsPlaying(true);
+    }
+  }, [currentIndex]);
+
+  const addToQueue = useCallback(async (track) => {
+    setTracks(prev => [...prev, track]);
+    if (currentIndex === null) {
+      await ensureAudioContext();
+      setCurrentIndex(0);
+      setIsPlaying(true);
+    }
+  }, [currentIndex]);
+
   const handleResetDefaults = useCallback(() => {
     setPlaybackRate(1);
     setAudioEffects({
@@ -545,6 +571,8 @@ export function LocalPlayerProvider({ children }) {
     togglePlay,
     prevTrack,
     nextTrack,
+    playNext,
+    addToQueue,
     seek,
     setVolume,
     setPlaybackRate,

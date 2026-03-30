@@ -45,7 +45,12 @@ export default function SettingsPage() {
   const [texturesEnabled, setTexturesEnabled] = useState(true);
   const [spotifyUser, setSpotifyUser] = useState(null);
   
-  const { audioEffects, setAudioEffects, playbackRate, setPlaybackRate, handleResetDefaults, mode } = usePlayer();
+  // Custom directory state
+  const [albumsRoot, setAlbumsRoot] = useState('');
+  const [playlistsRoot, setPlaylistsRoot] = useState('');
+  const [saveStatus, setSaveStatus] = useState('');
+
+  const { audioEffects, setAudioEffects, playbackRate, setPlaybackRate, handleResetDefaults, mode, refreshLibrary } = usePlayer();
 
   // Helpers for Displays
   const getStereoLabel = (val) => {
@@ -67,14 +72,67 @@ export default function SettingsPage() {
       setTexturesEnabled(false);
     }
 
-    fetch('/api/auth/me')
-      .then(res => {
-        if (!res.ok) throw new Error('Not connected');
-        return res.json();
+    // Fetch library info to populate directory inputs
+    fetch('/api/library')
+      .then(res => res.json())
+      .then(data => {
+        if (data.albumsRoot) setAlbumsRoot(data.albumsRoot);
+        if (data.playlistsRoot) setPlaylistsRoot(data.playlistsRoot);
       })
-      .then(data => setSpotifyUser(data))
-      .catch(err => console.log("Spotify profile fetch skipped/failed:", err.message));
-  }, []);
+      .catch(err => console.error("Failed to fetch library roots:", err));
+
+    if (mode === 'spotify') {
+      fetch('/api/auth/me')
+        .then(res => {
+          if (!res.ok) throw new Error('Not connected');
+          return res.json();
+        })
+        .then(data => setSpotifyUser(data))
+        .catch(err => console.log("Spotify profile fetch skipped/failed:", err.message));
+    }
+  }, [mode]);
+
+  const handleSaveDirectories = async () => {
+    setSaveStatus('Saving...');
+    try {
+      const response = await fetch('/api/settings/directories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ albumsRoot, playlistsRoot })
+      });
+      if (response.ok) {
+        setSaveStatus('Saved! Rescanning library...');
+        setTimeout(() => setSaveStatus(''), 3000);
+        // Sync context
+        if (refreshLibrary) refreshLibrary();
+      } else {
+        const err = await response.json();
+        setSaveStatus(`Failed: ${err.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      setSaveStatus(`Failed: ${e.message}`);
+    }
+  };
+
+  const handleBrowseAlbums = async () => {
+    if (window.electronAPI?.selectFolder) {
+      const path = await window.electronAPI.selectFolder();
+      if (path) setAlbumsRoot(path);
+    } else {
+      alert("Native folder browser is only available in the Electron desktop app.");
+    }
+  };
+
+  const handleBrowsePlaylists = async () => {
+    if (window.electronAPI?.selectFolder) {
+      const path = await window.electronAPI.selectFolder();
+      if (path) setPlaylistsRoot(path);
+    } else {
+      alert("Native folder browser is only available in the Electron desktop app.");
+    }
+  };
 
   const handleToggle = (e) => {
     const checked = e.target.checked;
@@ -118,7 +176,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      
+
       {/* 1. Visual Settings Rack */}
       <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
         <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -233,7 +291,7 @@ export default function SettingsPage() {
 
       {/* 4. Mastering & Spatial Rack — Local mode only */}
       {mode === 'local' && (
-      <div className="settings-rack-panel" style={{ padding: '30px' }}>
+      <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
         <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Spatial Imaging & Mastering
         </h2>
@@ -332,6 +390,175 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+
+{/* 6. Directory Configuration & Library Rescan */}
+      {mode === 'local' && (
+        <div className="settings-rack-panel" style={{ padding: '30px', marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '1.2rem', color: '#aaa', borderBottom: '2px solid #222', paddingBottom: '12px', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Local Disk Configuration
+          </h2>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* Albums Input */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#ccc', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                Albums Directory
+              </label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <input 
+                  type="text" 
+                  value={albumsRoot} 
+                  onChange={(e) => setAlbumsRoot(e.target.value)}
+                  style={{ 
+                    flex: 1, 
+                    padding: '12px 16px', 
+                    background: '#050505', 
+                    border: '1px solid #222', 
+                    color: '#38bdf8', 
+                    borderRadius: '2px', 
+                    fontFamily: 'monospace',
+                    fontSize: '0.9rem',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.8)',
+                    outline: 'none'
+                  }}
+                  placeholder="e.g. C:\Music\Albums"
+                />
+                <button 
+                  onClick={handleBrowseAlbums}
+                  style={{
+                    background: 'linear-gradient(145deg, #222, #111)',
+                    border: '1px solid #000',
+                    color: '#888',
+                    padding: '0 24px',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.5), inset 1px 1px 1px rgba(255,255,255,0.05)',
+                    transition: 'all 0.1s'
+                  }}
+                  onMouseDown={e => e.currentTarget.style.boxShadow = 'inset 2px 2px 5px rgba(0,0,0,0.8)'}
+                  onMouseUp={e => e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.5), inset 1px 1px 1px rgba(255,255,255,0.05)'}
+                  onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#888'}
+                >
+                  Browse...
+                </button>
+              </div>
+            </div>
+
+            {/* Playlists Input */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#ccc', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                Playlists Directory
+              </label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <input 
+                  type="text" 
+                  value={playlistsRoot} 
+                  onChange={(e) => setPlaylistsRoot(e.target.value)}
+                  style={{ 
+                    flex: 1, 
+                    padding: '12px 16px', 
+                    background: '#050505', 
+                    border: '1px solid #222', 
+                    color: '#38bdf8', 
+                    borderRadius: '2px', 
+                    fontFamily: 'monospace',
+                    fontSize: '0.9rem',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.8)',
+                    outline: 'none'
+                  }}
+                  placeholder="e.g. C:\Music\Playlists"
+                />
+                <button 
+                  onClick={handleBrowsePlaylists}
+                  style={{
+                    background: 'linear-gradient(145deg, #222, #111)',
+                    border: '1px solid #000',
+                    color: '#888',
+                    padding: '0 24px',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.5), inset 1px 1px 1px rgba(255,255,255,0.05)',
+                    transition: 'all 0.1s'
+                  }}
+                  onMouseDown={e => e.currentTarget.style.boxShadow = 'inset 2px 2px 5px rgba(0,0,0,0.8)'}
+                  onMouseUp={e => e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.5), inset 1px 1px 1px rgba(255,255,255,0.05)'}
+                  onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#888'}
+                >
+                  Browse...
+                </button>
+              </div>
+            </div>
+            
+            {/* Action Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginTop: '16px', paddingTop: '24px', borderTop: '2px solid #1a1a1a' }}>
+              <button 
+                onClick={handleSaveDirectories}
+                style={{
+                  background: 'linear-gradient(145deg, #222, #0d0d0d)',
+                  border: '1px solid #050505',
+                  color: '#38bdf8',
+                  padding: '14px 32px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  letterSpacing: '2px',
+                  fontSize: '0.9rem',
+                  boxShadow: '3px 3px 5px rgba(0,0,0,0.8), -1px -1px 2px rgba(255,255,255,0.06), inset 1px 1px 1px rgba(255,255,255,0.08)',
+                  transition: 'all 0.1s ease'
+                }}
+                onMouseDown={e => {
+                  e.currentTarget.style.background = '#111';
+                  e.currentTarget.style.boxShadow = 'inset 2px 2px 5px rgba(0,0,0,0.9)';
+                  e.currentTarget.style.transform = 'translateY(2px)';
+                  e.currentTarget.style.color = '#0284c7';
+                }}
+                onMouseUp={e => {
+                  e.currentTarget.style.background = 'linear-gradient(145deg, #222, #0d0d0d)';
+                  e.currentTarget.style.boxShadow = '3px 3px 5px rgba(0,0,0,0.8), -1px -1px 2px rgba(255,255,255,0.06), inset 1px 1px 1px rgba(255,255,255,0.08)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.color = '#38bdf8';
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = '#7dd3fc'}
+                onMouseLeave={e => e.currentTarget.style.color = '#38bdf8'}
+              >
+                Save Folders & Rescan
+              </button>
+              
+              {/* LCD Status Readout */}
+              {saveStatus && (
+                <div style={{
+                  background: '#000',
+                  border: '1px solid #1a1a1a',
+                  borderRadius: '4px',
+                  padding: '10px 16px',
+                  fontFamily: 'monospace',
+                  fontSize: '0.85rem',
+                  color: saveStatus.includes('Failed') ? '#ef4444' : '#4ade80',
+                  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.9)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  letterSpacing: '1px'
+                }}>
+                  <span style={{ marginRight: '8px', opacity: 0.5 }}></span>
+                  {saveStatus.toUpperCase()}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

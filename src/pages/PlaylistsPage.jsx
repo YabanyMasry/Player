@@ -14,6 +14,10 @@ export default function PlaylistsPage() {
   const [importStatus, setImportStatus] = useState({ loading: false, message: 'AWAITING SYNC...', type: 'idle' });
   const [authStatus, setAuthStatus] = useState({ authenticated: false, loading: true });
 
+  // Custom Playlist State
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
   useEffect(() => {
     fetchPlaylists();
 
@@ -143,6 +147,45 @@ export default function PlaylistsPage() {
     }
   };
 
+  const handleCreatePlaylist = async () => {
+    if (!newPlaylistName.trim()) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/playlists/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newPlaylistName })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create playlist');
+      setNewPlaylistName('');
+      setIsCreating(false);
+      fetchPlaylists();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeletePlaylist = async () => {
+    if (!selectedPlaylist || !selectedPlaylist.filename) return;
+    if (!window.confirm(`Delete playlist '${selectedPlaylist.name}'?`)) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/playlists/${encodeURIComponent(selectedPlaylist.filename)}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete playlist');
+      setSelectedPlaylist(null);
+      fetchPlaylists();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const statusColors = {
     idle: '#888',
     loading: '#facc15', // Amber
@@ -168,7 +211,6 @@ export default function PlaylistsPage() {
             <div style={{ fontSize: '0.75rem', color: '#888', fontFamily: 'monospace', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
               <span>SPOTIFY DATA SYNC</span>
               <a
-                href="http://127.0.0.1:4174/api/auth/login"
                 style={{ color: authStatus.authenticated ? '#4ade80' : '#1db954', textDecoration: 'none' }}
               >
                 {authStatus.loading ? '...' : authStatus.authenticated ? '[CONNECTED]' : '[LOGIN REQ]'}
@@ -217,6 +259,37 @@ export default function PlaylistsPage() {
             </div>
           </div>
 
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h4 style={{ margin: 0, color: '#aaa', fontSize: '0.8rem', letterSpacing: '0.1em' }}>LOCAL ARCHIVE</h4>
+            <button 
+              onClick={() => setIsCreating(!isCreating)}
+              style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer', fontFamily: 'monospace', fontSize: '1.2rem', padding: '0 5px' }}
+              title="New Playlist"
+            >
+              +
+            </button>
+          </div>
+
+          {isCreating && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <input 
+                type="text" 
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                placeholder="Playlist name..."
+                onKeyDown={(e) => e.key === 'Enter' && handleCreatePlaylist()}
+                style={{ flex: 1, background: '#050505', border: '1px solid #222', color: '#fff', padding: '6px', fontFamily: 'monospace', fontSize: '0.8rem' }}
+                autoFocus
+              />
+              <button 
+                onClick={handleCreatePlaylist}
+                style={{ background: '#222', color: '#fff', border: '1px solid #444', cursor: 'pointer', padding: '0 8px', fontSize: '0.8rem' }}
+              >
+                OK
+              </button>
+            </div>
+          )}
+
           <div className="rack-slots">
             {playlists.length === 0 ? (
               <p className="muted">No playlists found.</p>
@@ -244,13 +317,23 @@ export default function PlaylistsPage() {
                   <h2>{selectedPlaylist.name}</h2>
                   <p className="muted">{selectedPlaylist.tracks.length} Tracks</p>
                 </div>
-                <button
-                  className="play-btn"
-                  onClick={handlePlayPlaylist}
-                  disabled={selectedPlaylist.tracks.length === 0}
-                >
-                  LOAD INTO PLAYER
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {selectedPlaylist.filename && mode !== 'spotify' && (
+                    <button
+                      onClick={handleDeletePlaylist}
+                      style={{ background: 'transparent', border: '1px solid #e35a5a', color: '#e35a5a', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      DELETE
+                    </button>
+                  )}
+                  <button
+                    className="play-btn"
+                    onClick={handlePlayPlaylist}
+                    disabled={selectedPlaylist.tracks.length === 0}
+                  >
+                    LOAD INTO PLAYER
+                  </button>
+                </div>
               </div>
 
               <div className="track-list-container">

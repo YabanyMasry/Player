@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useEffect, useState } from 'react'
 import { usePlayer } from '../state/PlayerContext'
-import { usePlayerScale } from '../hooks/usePlayerScale' // Adjust path as needed
+import { usePlayerScale } from '../hooks/usePlayerScale'
 import VinylPlayer from '../components/VinylPlayer'
 import StudioFooter from '../components/StudioFooter'
+import ContextMenu from '../components/ContextMenu'
 import './VinylPlayerPage.css'
 
 /* ── main page ───────────────────────────────────────────────── */
@@ -24,6 +25,8 @@ export default function VinylPlayerPage() {
     hasNext,
     selectTrack,
     togglePlay,
+    playNext,
+    addToQueue,
     prevTrack,
     nextTrack,
     seek,
@@ -41,6 +44,45 @@ export default function VinylPlayerPage() {
   
   // 2. Get the current scale factor
   const playerScale = usePlayerScale(PLAYER_WIDTH, PLAYER_HEIGHT);
+
+  const [contextMenu, setContextMenu] = useState({ x: 0, y: 0, options: [] });
+  const [playlists, setPlaylists] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/playlists').then(r => r.json()).then(setPlaylists).catch(()=>{})
+  }, []);
+
+  const handleContextMenu = (e, track, onPlay) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const subOptions = playlists.map(pl => ({
+      label: pl.name,
+      onClick: async () => {
+        try {
+          await fetch(`/api/playlists/${encodeURIComponent(pl.filename)}/add-track`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ trackPath: track.absolutePath || track.spotifyUri || track.id })
+          })
+        } catch (err) {
+          console.error('Failed to add to playlist:', err)
+        }
+      }
+    }))
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      options: [
+        { label: 'Play Now', onClick: onPlay },
+        { label: 'Play Next', onClick: () => playNext && playNext(track), disabled: !playNext },
+        { label: 'Add to Queue', onClick: () => addToQueue && addToQueue(track), disabled: !addToQueue },
+        { divider: true },
+        { label: 'Add to Playlist...', submenu: subOptions }
+      ]
+    })
+  }
 
   const handleEffectChange = useCallback((key, value) => {
     setAudioEffects(prev => ({ ...prev, [key]: value }))
@@ -136,6 +178,7 @@ export default function VinylPlayerPage() {
                     key={track.id || i}
                     className={`vp-track-item ${isActive ? 'vp-track-item--active' : ''}`}
                     onClick={() => selectTrack(i)}
+                    onContextMenu={(e) => handleContextMenu(e, track, () => selectTrack(i))}
                   >
                     <span className="vp-track-num">{i + 1}</span>
                     <span className="vp-track-name">{track.title || track.filename || 'Unknown Track'}</span>
@@ -156,6 +199,7 @@ export default function VinylPlayerPage() {
                     key={track.id || i}
                     className={`vp-track-item ${isActive ? 'vp-track-item--active' : ''}`}
                     onClick={() => selectTrack(track.index)}
+                    onContextMenu={(e) => handleContextMenu(e, track, () => selectTrack(track.index))}
                   >
                     <span className="vp-track-num">{i + 1}</span>
                     <span className="vp-track-name">{track.title || track.filename || 'Unknown Track'}</span>
@@ -180,6 +224,12 @@ export default function VinylPlayerPage() {
         onTogglePlay={togglePlay}
         onSeek={seek}
         onVolumeChange={setVolume}
+      />
+      <ContextMenu 
+        x={contextMenu.x} 
+        y={contextMenu.y} 
+        options={contextMenu.options} 
+        onClose={() => setContextMenu({ x: 0, y: 0, options: [] })} 
       />
     </div>
   )

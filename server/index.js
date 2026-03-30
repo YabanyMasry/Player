@@ -7,6 +7,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import stringSimilarity from 'string-similarity' 
 import spotifyRouter, { initSpotify, getSpotifyPlaylistTracks } from './spotify.js'
+import os from 'node:os'
 
 const app = express()
 app.set('trust proxy', 1) // Required for Railway/reverse proxies to accurately process express-rate-limit IP addresses
@@ -16,14 +17,22 @@ const PORT = Number(process.env.PORT || 4174)
 app.use(cors())
 app.use(express.json())
 
-// --- LOCAL MUSIC PATH CONFIGURATION ---
-const ALBUMS_ROOT = process.env.ALBUMS_ROOT || (process.env.VITE_PLAYER_MODE === 'spotify' ? process.cwd() : '');
-const PLAYLISTS_ROOT = process.env.PLAYLISTS_ROOT || (ALBUMS_ROOT ? path.join(ALBUMS_ROOT, '..', 'Playlists') : process.cwd());
+// --- DEFAULT TO USER'S MUSIC FOLDER ON OFFLINE/PACKAGED BUILDS ---
+const defaultMusicDir = path.join(os.homedir(), 'Music', 'VinylPlayer');
+let ALBUMS_ROOT = process.env.ALBUMS_ROOT || path.join(defaultMusicDir, 'Albums');
+let PLAYLISTS_ROOT = process.env.PLAYLISTS_ROOT || path.join(defaultMusicDir, 'Playlists');
 
-if (!ALBUMS_ROOT && process.env.VITE_PLAYER_MODE !== 'spotify') {
-  console.error('\x1b[31m%s\x1b[0m', '❌ CRITICAL ERROR: ALBUMS_ROOT is not defined in .env! Cannot start the server in local mode.');
-  process.exit(1);
-}
+// Load User Settings Overrides
+const CONFIG_PATH = path.join(defaultMusicDir, 'config.json');
+try {
+  const overrides = JSON.parse(require('node:fs').readFileSync(CONFIG_PATH, 'utf8'));
+  if (overrides.ALBUMS_ROOT) ALBUMS_ROOT = overrides.ALBUMS_ROOT;
+  if (overrides.PLAYLISTS_ROOT) PLAYLISTS_ROOT = overrides.PLAYLISTS_ROOT;
+} catch {}
+
+// Ensure directories exist silently on server boot
+try { fs.mkdir(ALBUMS_ROOT, { recursive: true }).catch(()=>{}) } catch {}
+try { fs.mkdir(PLAYLISTS_ROOT, { recursive: true }).catch(()=>{}) } catch {}
 
 const AUDIO_EXT_RE = /\.(mp3|m4a|aac|wav|flac|ogg|opus|wma)$/i
 const COVER_RE = /^cover\.(jpg|jpeg|png|webp)$/i
@@ -252,6 +261,55 @@ app.get('/api/playlists', async (req, res) => {
   }
 });
 
+app.post('/api/playlists/create', async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Playlist name required.' });
+    
+    const safeFileName = name.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'Untitled Playlist';
+    const playlistFilePath = path.join(PLAYLISTS_ROOT, `${safeFileName}.m3u8`);
+    
+    try {
+      await fs.access(playlistFilePath);
+      return res.status(400).json({ error: 'Playlist already exists.' });
+    } catch { /* proceed */ }
+
+    await fs.mkdir(PLAYLISTS_ROOT, { recursive: true });
+    await fs.writeFile(playlistFilePath, "#EXTM3U\n", 'utf8');
+
+    res.json({ success: true, name: safeFileName, filename: `${safeFileName}.m3u8` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/playlists/:filename/add-track', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const { trackPath } = req.body;
+    if (!trackPath) return res.status(400).json({ error: 'trackPath is required.' });
+    
+    const absPath = path.join(PLAYLISTS_ROOT, filename);
+    try { await fs.access(absPath); } catch { return res.status(404).json({ error: 'Playlist not found.' }); }
+
+    await fs.appendFile(absPath, `${toPosix(trackPath)}\n`, 'utf8');
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/playlists/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const absPath = path.join(PLAYLISTS_ROOT, filename);
+    await fs.unlink(absPath);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/playlists/:filename', async (req, res) => {
   try {
     const { filename } = req.params;
@@ -274,13 +332,45 @@ app.get('/api/playlists/:filename', async (req, res) => {
 
 app.get('/api/library', async (_req, res) => {
   if (!cachedLibrary.scannedAt) await scanLibrary()
-  res.json(cachedLibrary)
+  res.json({ ...cachedLibrary, albumsRoot: ALBUMS_ROOT, playlistsRoot: PLAYLISTS_ROOT })
 })
 
 app.post('/api/library/refresh', async (_req, res) => {
   await scanLibrary()
-  res.json(cachedLibrary)
+  res.json({ ...cachedLibrary, albumsRoot: ALBUMS_ROOT, playlistsRoot: PLAYLISTS_ROOT })
 })
+
+// --- SETTINGS ROUTES ---
+app.post('/api/settings/directories', async (req, res) => {
+  try {
+    const { albumsRoot, playlistsRoot } = req.body;
+    let updated = false;
+    
+    // Quick validation that the paths exist (or can be treated as strings)
+    if (typeof albumsRoot === 'string' && albumsRoot.trim() !== '') {
+      ALBUMS_ROOT = path.resolve(albumsRoot.trim());
+      updated = true;
+    }
+    
+    if (typeof playlistsRoot === 'string' && playlistsRoot.trim() !== '') {
+      PLAYLISTS_ROOT = path.resolve(playlistsRoot.trim());
+      updated = true;
+    }
+
+    if (updated) {
+      await fs.mkdir(defaultMusicDir, { recursive: true }).catch(()=>{});
+      await fs.writeFile(CONFIG_PATH, JSON.stringify({ ALBUMS_ROOT, PLAYLISTS_ROOT }, null, 2), 'utf8');
+      
+      // Rescan immediately using the new roots
+      await scanLibrary();
+      res.json({ success: true, albumsRoot: ALBUMS_ROOT, playlistsRoot: PLAYLISTS_ROOT, library: cachedLibrary });
+    } else {
+      res.status(400).json({ error: 'No valid paths provided.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.get('/media/*', async (req, res) => {
   try {

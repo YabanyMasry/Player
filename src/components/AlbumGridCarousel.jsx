@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePlayer } from '../state/PlayerContext'
+import ContextMenu from './ContextMenu'
 import gsap from 'gsap'
 import vinylImage from '../assets/Vinyl.png'
 import coverOverlay1 from '../assets/1.png'
@@ -19,11 +20,54 @@ function getCookie(name) {
 }
 
 export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
-  const { playGlobalTrack, selectTrack } = usePlayer()
+  const { playGlobalTrack, selectTrack, playNext, addToQueue } = usePlayer()
   const [comboMode, setComboMode] = useState('grid')
   const enableTextures = getCookie('enableAlbumTextures') !== 'false'
   const [comboCarouselIndex, setComboCarouselIndex] = useState(0)
   const [revealedAlbumKey, setRevealedAlbumKey] = useState(null)
+  
+  const [contextMenu, setContextMenu] = useState({ x: 0, y: 0, options: [] })
+  const [playlists, setPlaylists] = useState([])
+
+  useEffect(() => {
+    fetch('/api/playlists').then(r => r.json()).then(setPlaylists).catch(()=>{})
+  }, [])
+
+  const handleContextMenu = (e, track, album) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const subOptions = playlists.map(pl => ({
+      label: pl.name,
+      onClick: async () => {
+        try {
+          await fetch(`/api/playlists/${encodeURIComponent(pl.filename)}/add-track`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ trackPath: track.absolutePath || track.spotifyUri || track.id })
+          })
+        } catch (err) {
+          console.error('Failed to add to playlist:', err)
+        }
+      }
+    }))
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      options: [
+        { label: 'Play Now', onClick: () => {
+            if (track.index !== undefined) playGlobalTrack(track.index)
+            else if (onPlayAlbum) onPlayAlbum(album.album)
+          } 
+        },
+        { label: 'Play Next', onClick: () => playNext && playNext(track), disabled: !playNext },
+        { label: 'Add to Queue', onClick: () => addToQueue && addToQueue(track), disabled: !addToQueue },
+        { divider: true },
+        { label: 'Add to Playlist...', submenu: subOptions }
+      ]
+    })
+  }
   
   const [targetSize, setTargetSize] = useState(() => 
     Math.min(window.innerWidth * 0.85, window.innerHeight * 0.85)
@@ -450,6 +494,7 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
                             onPlayAlbum(album.album)
                           }
                         }}
+                        onContextMenu={(e) => handleContextMenu(e, track, album)}
                       >
                         <span className="agc-track-num">{i + 1}</span>
                         <span className="agc-track-name">{track.title || track.filename || 'Unknown Track'}</span>
@@ -462,6 +507,12 @@ export default function AlbumGridCarousel({ albums = [], onPlayAlbum }) {
           ))}
         </div>
       </div>
+      <ContextMenu 
+        x={contextMenu.x} 
+        y={contextMenu.y} 
+        options={contextMenu.options} 
+        onClose={() => setContextMenu({ x: 0, y: 0, options: [] })} 
+      />
     </>
   )
 }
